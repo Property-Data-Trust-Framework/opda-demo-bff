@@ -229,6 +229,86 @@ resource "aws_iam_role_policy" "github_actions" {
       #   ]
       #   Resource = "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${var.name}-my-table-*"
       # },
+      # ── S3 — SPA bucket ────────────────────────────────────────────────────
+      {
+        Sid      = "S3SpaBucketManage"
+        Effect   = "Allow"
+        Action   = [
+          "s3:CreateBucket", "s3:DeleteBucket", "s3:DeleteBucketPolicy",
+          "s3:GetBucketAcl", "s3:GetBucketCORS", "s3:GetBucketLocation",
+          "s3:GetBucketObjectLockConfiguration", "s3:GetBucketPolicy",
+          "s3:GetBucketPolicyStatus", "s3:GetBucketPublicAccessBlock",
+          "s3:GetBucketTagging", "s3:GetBucketVersioning",
+          "s3:GetBucketWebsite", "s3:GetEncryptionConfiguration",
+          "s3:GetLifecycleConfiguration", "s3:ListBucket",
+          "s3:PutBucketAcl", "s3:PutBucketCORS", "s3:PutBucketPolicy",
+          "s3:PutBucketPublicAccessBlock", "s3:PutBucketTagging",
+          "s3:PutBucketVersioning", "s3:PutBucketWebsite",
+          "s3:PutEncryptionConfiguration", "s3:PutLifecycleConfiguration",
+          "s3:DeleteObject", "s3:GetObject", "s3:PutObject",
+          "s3:ListBucketMultipartUploads", "s3:ListMultipartUploadParts",
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.name}-*",
+          "arn:aws:s3:::${var.name}-*/*",
+        ]
+      },
+      # ── CloudFront — demo distribution ─────────────────────────────────────
+      {
+        Sid    = "CloudFrontManage"
+        Effect = "Allow"
+        Action = [
+          "cloudfront:CreateDistribution", "cloudfront:DeleteDistribution",
+          "cloudfront:GetDistribution", "cloudfront:GetDistributionConfig",
+          "cloudfront:UpdateDistribution", "cloudfront:TagResource",
+          "cloudfront:UntagResource", "cloudfront:ListTagsForResource",
+          "cloudfront:CreateOriginAccessControl",
+          "cloudfront:DeleteOriginAccessControl",
+          "cloudfront:GetOriginAccessControl",
+          "cloudfront:GetOriginAccessControlConfig",
+          "cloudfront:UpdateOriginAccessControl",
+          "cloudfront:CreateFunction", "cloudfront:DeleteFunction",
+          "cloudfront:DescribeFunction", "cloudfront:GetFunction",
+          "cloudfront:PublishFunction", "cloudfront:UpdateFunction",
+          "cloudfront:AssociateAlias",
+        ]
+        Resource = "*"
+      },
+      # ── Route53 — ext hosted zone ──────────────────────────────────────────
+      {
+        Sid      = "Route53ManageZones"
+        Effect   = "Allow"
+        Action   = [
+          "route53:CreateHostedZone", "route53:DeleteHostedZone",
+          "route53:GetHostedZone", "route53:ListHostedZones",
+          "route53:ListHostedZonesByName",
+          "route53:ChangeTagsForResource", "route53:ListTagsForResource",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid      = "Route53ManageRecords"
+        Effect   = "Allow"
+        Action   = [
+          "route53:ChangeResourceRecordSets",
+          "route53:GetChange",
+          "route53:ListResourceRecordSets",
+        ]
+        Resource = "*"
+      },
+      # ── ACM — certificate for ext.smartpropdata.org.uk ─────────────────────
+      {
+        Sid    = "ACMManage"
+        Effect = "Allow"
+        Action = [
+          "acm:RequestCertificate", "acm:DeleteCertificate",
+          "acm:DescribeCertificate", "acm:GetCertificate",
+          "acm:ListCertificates", "acm:ListTagsForCertificate",
+          "acm:AddTagsToCertificate", "acm:RemoveTagsFromCertificate",
+          "acm:UpdateCertificateOptions",
+        ]
+        Resource = "*"
+      },
       # ── API docs site spec publish ─────────────────────────────────────────
       {
         Sid      = "ApiDocsSpecWrite"

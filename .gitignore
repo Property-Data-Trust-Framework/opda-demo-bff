@@ -1,0 +1,38 @@
+# Populated env files — contain secrets
+scripts/.env.*
+!scripts/.env.example
+
+# Key material — folder structure is tracked, contents are not
+keys/**
+!keys/**/.gitkeep
+!keys/**/ca/*.pem
+
+# Terraform working dirs
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# Populated tfvars — contain secrets
+*.tfvars
+!*.tfvars.example
+# Non-secret IAM tfvars are committed (name + github_repo, no credentials)
+!terraform/iam/terraform.tfvars
+.DS_Store
+
+# .NET build output
+[Bb]in/
+[Oo]bj/
+[Tt]est[Rr]esult*/
+
+# Node (SPA)
+node_modules/
+dist/
+.env
+
+# IDE
+.idea/
+.vs/
+.vscode/
+*.user
+*.suo

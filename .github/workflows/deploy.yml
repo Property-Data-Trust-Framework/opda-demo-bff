@@ -1,0 +1,126 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: eu-west-2
+  TF_VERSION: "1.10.5"
+  DOTNET_VERSION: "9.0"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - run: dotnet test --configuration Release
+        working-directory: src
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: test
+    environment: dev
+
+    env:
+      TF_BACKEND_KEY: ${{ github.event.repository.name }}/dev/terraform.tfstate
+      TF_VAR_name:              ${{ github.event.repository.name }}
+      TF_VAR_environment:       dev
+      TF_VAR_github_repo:       ${{ github.repository }}
+      TF_VAR_image_tag:         ${{ github.sha }}
+      TF_VAR_smoove_api_key:    ${{ secrets.SMOOVE_API_KEY }}
+      TF_VAR_opda_client_cert:  ${{ secrets.OPDA_CLIENT_CERT }}
+      TF_VAR_opda_client_key:   ${{ secrets.OPDA_CLIENT_KEY }}
+      TF_VAR_opda_api_base_url: ${{ vars.OPDA_API_BASE_URL }}
+      TF_VAR_parent_zone_id:    ${{ vars.PARENT_ZONE_ID }}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform init
+        run: |
+          BUCKET="ops-terraform-state-$(aws sts get-caller-identity --query Account --output text)"
+          terraform init \
+            -backend-config="bucket=$BUCKET" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="key=${{ env.TF_BACKEND_KEY }}"
+        working-directory: terraform
+
+      - name: Terraform apply (ECR bootstrap)
+        run: terraform apply -auto-approve -input=false -target=aws_ecr_repository.app
+        working-directory: terraform
+
+      - name: Build and push Lambda image
+        env:
+          IMAGE_URI: ${{ steps.ecr-login.outputs.registry }}/${{ github.event.repository.name }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$IMAGE_URI:$IMAGE_TAG" -t "$IMAGE_URI:latest" .
+          docker push "$IMAGE_URI:$IMAGE_TAG"
+          docker push "$IMAGE_URI:latest"
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve -input=false
+        working-directory: terraform
+
+      # ── SPA build + deploy ──────────────────────────────────────────────────
+      # Uncomment and adapt once the SPA framework is chosen.
+      #
+      # - name: Build SPA
+      #   working-directory: spa
+      #   run: |
+      #     npm ci
+      #     npm run build
+      #
+      # - name: Deploy SPA to S3
+      #   working-directory: spa
+      #   run: |
+      #     BUCKET=$(cd ../terraform && terraform output -raw spa_bucket)
+      #     DIST_ID=$(cd ../terraform && terraform output -raw cloudfront_domain)
+      #     aws s3 sync dist/ "s3://$BUCKET" --delete
+      #     aws cloudfront create-invalidation \
+      #       --distribution-id "$(aws cloudfront list-distributions \
+      #         --query "DistributionList.Items[?DomainName=='$DIST_ID'].Id | [0]" \
+      #         --output text)" \
+      #       --paths "/demo/*"
+
+      - name: Deployment summary
+        if: always()
+        working-directory: terraform
+        run: |
+          echo "## Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Output | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          terraform output -json 2>/dev/null | \
+            python3 -c "
+          import sys, json
+          for k, v in json.load(sys.stdin).items():
+              print(f'| \`{k}\` | \`{v[\"value\"]}\` |')
+          " >> "$GITHUB_STEP_SUMMARY" || true
