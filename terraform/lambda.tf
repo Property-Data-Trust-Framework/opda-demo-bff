@@ -17,6 +17,7 @@ resource "aws_lambda_function" "app" {
       OPDA_API_BASE_URL      = var.opda_api_base_url
       OPDA_CLIENT_CERT_PATH  = aws_ssm_parameter.opda_client_cert.name
       OPDA_CLIENT_KEY_PATH   = aws_ssm_parameter.opda_client_key.name
+      TABLE_NAME             = aws_dynamodb_table.webhook_events.name
     }
   }
 

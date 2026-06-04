@@ -37,3 +37,21 @@ resource "aws_iam_role_policy" "lambda_ssm" {
     }]
   })
 }
+
+resource "aws_iam_role_policy" "lambda_dynamodb" {
+  name = "dynamodb"
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+      ]
+      Resource = aws_dynamodb_table.webhook_events.arn
+    }]
+  })
+}

@@ -310,6 +310,19 @@ resource "aws_iam_role_policy" "github_actions" {
         ]
         Resource = "*"
       },
+      # ── DynamoDB — webhook events table ───────────────────────────────────────
+      {
+        Sid    = "DynamoDBWebhookEvents"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:CreateTable", "dynamodb:DeleteTable",
+          "dynamodb:DescribeTable", "dynamodb:DescribeTimeToLive",
+          "dynamodb:ListTagsOfResource", "dynamodb:TagResource", "dynamodb:UntagResource",
+          "dynamodb:UpdateTable", "dynamodb:UpdateTimeToLive",
+          "dynamodb:DescribeContinuousBackups",
+        ]
+        Resource = "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${var.name}-*"
+      },
       # ── API docs site spec publish ─────────────────────────────────────────
       {
         Sid      = "ApiDocsSpecWrite"
