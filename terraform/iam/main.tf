@@ -70,6 +70,7 @@ resource "aws_iam_role_policy" "github_actions" {
           "ecr:InitiateLayerUpload", "ecr:ListTagsForResource",
           "ecr:PutImage", "ecr:PutLifecyclePolicy",
           "ecr:DeleteRepositoryPolicy", "ecr:SetRepositoryPolicy",
+          "ecr:TagResource", "ecr:UntagResource",
           "ecr:UploadLayerPart",
         ]
         Resource = "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.current.account_id}:repository/${var.name}"
