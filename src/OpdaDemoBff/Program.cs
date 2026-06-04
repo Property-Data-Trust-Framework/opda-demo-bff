@@ -9,9 +9,8 @@ builder.Logging.AddJsonConsole(o => o.TimestampFormat = "yyyy-MM-ddTHH:mm:ssZ");
 var tableName = Environment.GetEnvironmentVariable("TABLE_NAME")
     ?? throw new InvalidOperationException("TABLE_NAME environment variable is not set");
 
-builder.Services.AddAWSService<IAmazonDynamoDB>();
-builder.Services.AddSingleton<IWebhookStore>(sp =>
-    new DynamoWebhookStore(sp.GetRequiredService<IAmazonDynamoDB>(), tableName));
+builder.Services.AddSingleton<IWebhookStore>(
+    new DynamoWebhookStore(new AmazonDynamoDBClient(), tableName));
 
 var app = builder.Build();
 
