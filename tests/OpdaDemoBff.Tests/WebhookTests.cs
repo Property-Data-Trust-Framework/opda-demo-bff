@@ -19,7 +19,8 @@ public class WebhookTests : IClassFixture<WebhookTests.TestingFactory>
     public WebhookTests(TestingFactory factory)
     {
         _client = factory.CreateClient();
-        _store   = factory.Store;
+        _store  = factory.Store;
+        _store.Stored.Clear();
     }
 
     // ── POST /webhook ─────────────────────────────────────────────────────────
@@ -33,22 +34,26 @@ public class WebhookTests : IClassFixture<WebhookTests.TestingFactory>
 
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
 
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.True(body.GetProperty("eventId").GetString()?.Length > 0);
+        var body     = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        var eventId  = body.GetProperty("eventId").GetString();
+        Assert.True(eventId?.Length > 0);
         Assert.Equal("stored", body.GetProperty("status").GetString());
 
-        Assert.Single(_store.Stored);
-        Assert.Equal(jwt, _store.Stored[0].RawBody);
+        // Check the specific event was stored by ID rather than asserting
+        // an exact count — other tests may have added items to the shared store.
+        Assert.Contains(_store.Stored, e => e.EventId == eventId && e.RawBody == jwt);
     }
 
     [Fact]
     public async Task PostWebhook_EmptyBody_Returns400()
     {
+        var countBefore = _store.Stored.Count;
+
         var resp = await _client.PostAsync("/webhook",
             new StringContent("", Encoding.UTF8, "text/plain"));
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
-        Assert.Empty(_store.Stored);
+        Assert.Equal(countBefore, _store.Stored.Count);
     }
 
     // ── GET /demo-api/events ──────────────────────────────────────────────────
@@ -107,11 +112,8 @@ public class WebhookTests : IClassFixture<WebhookTests.TestingFactory>
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("TABLE_NAME", "test-table");
             builder.ConfigureServices(services =>
-            {
-                services.AddSingleton<IWebhookStore>(Store);
-            });
+                services.AddSingleton<IWebhookStore>(Store));
         }
     }
 

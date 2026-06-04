@@ -1,4 +1,5 @@
 using Amazon.DynamoDBv2;
+using OpdaDemoBff.Config;
 using OpdaDemoBff.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -6,18 +7,17 @@ builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(o => o.TimestampFormat = "yyyy-MM-ddTHH:mm:ssZ");
 
-var tableName = Environment.GetEnvironmentVariable("TABLE_NAME")
-    ?? throw new InvalidOperationException("TABLE_NAME environment variable is not set");
+builder.Services.Configure<DynamoConfig>(
+    builder.Configuration.GetSection(nameof(DynamoConfig)));
 
-builder.Services.AddSingleton<IWebhookStore>(
-    new DynamoWebhookStore(new AmazonDynamoDBClient(), tableName));
+builder.Services.AddSingleton<IAmazonDynamoDB>(_ => new AmazonDynamoDBClient());
+builder.Services.AddSingleton<IWebhookStore, DynamoWebhookStore>();
 
 var app = builder.Build();
 
 // ── POST /webhook ─────────────────────────────────────────────────────────────
 // Smoove delivers a signed RS256 JWT as the raw request body.
-// We store it as-is for now so we can inspect the format and verify the shape
-// before adding JWT validation.
+// We store it as-is for now to inspect the shape before adding JWT validation.
 
 app.MapPost("/webhook", async (HttpRequest request, IWebhookStore store) =>
 {

@@ -1,22 +1,24 @@
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using Microsoft.Extensions.Options;
+using OpdaDemoBff.Config;
 using OpdaDemoBff.Models;
 
 namespace OpdaDemoBff.Services;
 
-public class DynamoWebhookStore(IAmazonDynamoDB dynamo, string tableName) : IWebhookStore
+public class DynamoWebhookStore(IAmazonDynamoDB dynamo, IOptions<DynamoConfig> config) : IWebhookStore
 {
-    // Events are retained for 7 days then auto-deleted via TTL.
     private static readonly TimeSpan Retention = TimeSpan.FromDays(7);
+    private string TableName => config.Value.TableName;
 
     public async Task<string> StoreAsync(string rawBody, CancellationToken ct = default)
     {
-        var eventId   = Guid.NewGuid().ToString();
+        var eventId    = Guid.NewGuid().ToString();
         var receivedAt = DateTimeOffset.UtcNow;
 
         await dynamo.PutItemAsync(new PutItemRequest
         {
-            TableName = tableName,
+            TableName = TableName,
             Item = new Dictionary<string, AttributeValue>
             {
                 ["eventId"]    = new AttributeValue { S = eventId },
@@ -33,7 +35,7 @@ public class DynamoWebhookStore(IAmazonDynamoDB dynamo, string tableName) : IWeb
     {
         var response = await dynamo.ScanAsync(new ScanRequest
         {
-            TableName = tableName,
+            TableName = TableName,
             Limit     = limit,
         }, ct);
 
@@ -47,8 +49,8 @@ public class DynamoWebhookStore(IAmazonDynamoDB dynamo, string tableName) : IWeb
     {
         var response = await dynamo.GetItemAsync(new GetItemRequest
         {
-            TableName = tableName,
-            Key = new Dictionary<string, AttributeValue>
+            TableName = TableName,
+            Key       = new Dictionary<string, AttributeValue>
             {
                 ["eventId"] = new AttributeValue { S = eventId }
             }
