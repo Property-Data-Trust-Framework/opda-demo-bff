@@ -23,11 +23,6 @@ output "spa_bucket" {
   description = "S3 bucket name — sync SPA build output here"
 }
 
-output "ns_records" {
-  value       = aws_route53_zone.ext.name_servers
-  description = "NS records to add to the parent smartpropdata.org.uk zone for ext subdomain delegation"
-}
-
 output "apigw_endpoint" {
   value       = aws_apigatewayv2_api.app.api_endpoint
   description = "HTTP API Gateway endpoint (direct, bypassing CloudFront — useful for debugging)"

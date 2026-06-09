@@ -1,20 +1,7 @@
-# ── ext.smartpropdata.org.uk hosted zone ─────────────────────────────────────
+# ── ext.smartpropdata.org.uk hosted zone (pre-existing, look up don't create) ─
 
-resource "aws_route53_zone" "ext" {
+data "aws_route53_zone" "ext" {
   name = "ext.smartpropdata.org.uk"
-  tags = local.tags
-}
-
-# If the parent smartpropdata.org.uk zone ID is provided, automatically create
-# the NS delegation record. Otherwise add the NS records to the parent zone manually
-# (see the ns_records output).
-resource "aws_route53_record" "ext_ns_delegation" {
-  count   = var.parent_zone_id != "" ? 1 : 0
-  zone_id = var.parent_zone_id
-  name    = "ext.smartpropdata.org.uk"
-  type    = "NS"
-  ttl     = 300
-  records = aws_route53_zone.ext.name_servers
 }
 
 # ── ACM certificate (must be in us-east-1 for CloudFront) ────────────────────
@@ -40,7 +27,7 @@ resource "aws_route53_record" "cert_validation" {
     }
   }
 
-  zone_id = aws_route53_zone.ext.zone_id
+  zone_id = data.aws_route53_zone.ext.zone_id
   name    = each.value.name
   type    = each.value.type
   ttl     = 60
@@ -56,7 +43,7 @@ resource "aws_acm_certificate_validation" "ext" {
 # ── DNS A record → CloudFront ─────────────────────────────────────────────────
 
 resource "aws_route53_record" "apex" {
-  zone_id = aws_route53_zone.ext.zone_id
+  zone_id = data.aws_route53_zone.ext.zone_id
   name    = "ext.smartpropdata.org.uk"
   type    = "A"
 

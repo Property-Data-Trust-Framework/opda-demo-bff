@@ -23,14 +23,6 @@ variable "image_tag" {
   default = "latest"
 }
 
-# ── External domain ───────────────────────────────────────────────────────────
-
-variable "parent_zone_id" {
-  type        = string
-  description = "Route53 zone ID of the parent smartpropdata.org.uk zone, used to delegate ext.smartpropdata.org.uk. Leave empty to add NS records manually."
-  default     = ""
-}
-
 # ── Smoove integration ────────────────────────────────────────────────────────
 
 variable "smoove_api_key" {

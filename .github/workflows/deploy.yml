@@ -38,7 +38,6 @@ jobs:
       TF_VAR_opda_client_cert:  ${{ secrets.OPDA_CLIENT_CERT }}
       TF_VAR_opda_client_key:   ${{ secrets.OPDA_CLIENT_KEY }}
       TF_VAR_opda_api_base_url: ${{ vars.OPDA_API_BASE_URL }}
-      TF_VAR_parent_zone_id:    ${{ vars.PARENT_ZONE_ID }}
 
     permissions:
       id-token: write

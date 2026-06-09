@@ -196,6 +196,10 @@ resource "aws_iam_role_policy" "github_actions" {
         Effect = "Allow"
         Action = [
           "logs:CreateLogGroup", "logs:DeleteLogGroup",
+          "logs:CreateLogDelivery", "logs:DeleteLogDelivery",
+          "logs:GetLogDelivery", "logs:UpdateLogDelivery",
+          "logs:ListLogDeliveries", "logs:PutResourcePolicy",
+          "logs:DescribeResourcePolicies",
           "logs:ListTagsForResource", "logs:ListTagsLogGroup",
           "logs:PutRetentionPolicy", "logs:TagLogGroup",
           "logs:TagResource", "logs:UntagResource",
@@ -236,7 +240,8 @@ resource "aws_iam_role_policy" "github_actions" {
         Effect   = "Allow"
         Action   = [
           "s3:CreateBucket", "s3:DeleteBucket", "s3:DeleteBucketPolicy",
-          "s3:GetBucketAcl", "s3:GetBucketCORS", "s3:GetBucketLocation",
+          "s3:GetAccelerateConfiguration", "s3:GetBucketAcl",
+          "s3:GetBucketCORS", "s3:GetBucketLocation",
           "s3:GetBucketObjectLockConfiguration", "s3:GetBucketPolicy",
           "s3:GetBucketPolicyStatus", "s3:GetBucketPublicAccessBlock",
           "s3:GetBucketTagging", "s3:GetBucketVersioning",
