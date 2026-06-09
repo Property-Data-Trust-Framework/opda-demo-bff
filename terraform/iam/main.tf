@@ -192,19 +192,27 @@ resource "aws_iam_role_policy" "github_actions" {
         Resource = "*"
       },
       {
-        Sid    = "LogsManage"
+        Sid    = "LogsManageGroups"
         Effect = "Allow"
         Action = [
           "logs:CreateLogGroup", "logs:DeleteLogGroup",
-          "logs:CreateLogDelivery", "logs:DeleteLogDelivery",
-          "logs:GetLogDelivery", "logs:UpdateLogDelivery",
-          "logs:ListLogDeliveries", "logs:PutResourcePolicy",
-          "logs:DescribeResourcePolicies",
           "logs:ListTagsForResource", "logs:ListTagsLogGroup",
           "logs:PutRetentionPolicy", "logs:TagLogGroup",
           "logs:TagResource", "logs:UntagResource",
         ]
         Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:*${var.name}*"
+      },
+      {
+        # Log delivery actions are account-level and require Resource = "*"
+        Sid    = "LogsDelivery"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogDelivery", "logs:DeleteLogDelivery",
+          "logs:GetLogDelivery", "logs:UpdateLogDelivery",
+          "logs:ListLogDeliveries", "logs:PutResourcePolicy",
+          "logs:DescribeResourcePolicies",
+        ]
+        Resource = "*"
       },
       # ── Terraform state ────────────────────────────────────────────────────
       {
