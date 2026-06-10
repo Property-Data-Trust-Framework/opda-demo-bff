@@ -88,25 +88,21 @@ jobs:
         working-directory: terraform
 
       # ── SPA build + deploy ──────────────────────────────────────────────────
-      # Uncomment and adapt once the SPA framework is chosen.
-      #
-      # - name: Build SPA
-      #   working-directory: spa
-      #   run: |
-      #     npm ci
-      #     npm run build
-      #
-      # - name: Deploy SPA to S3
-      #   working-directory: spa
-      #   run: |
-      #     BUCKET=$(cd ../terraform && terraform output -raw spa_bucket)
-      #     DIST_ID=$(cd ../terraform && terraform output -raw cloudfront_domain)
-      #     aws s3 sync dist/ "s3://$BUCKET" --delete
-      #     aws cloudfront create-invalidation \
-      #       --distribution-id "$(aws cloudfront list-distributions \
-      #         --query "DistributionList.Items[?DomainName=='$DIST_ID'].Id | [0]" \
-      #         --output text)" \
-      #       --paths "/demo/*"
+
+      - name: Build SPA
+        working-directory: spa
+        run: node build.mjs
+
+      - name: Deploy SPA to S3
+        working-directory: spa
+        run: |
+          BUCKET=$(cd ../terraform && terraform output -raw spa_bucket)
+          CF_DOMAIN=$(cd ../terraform && terraform output -raw cloudfront_domain)
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?DomainName=='$CF_DOMAIN'].Id | [0]" \
+            --output text)
+          aws s3 sync dist/ "s3://$BUCKET" --delete
+          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/demo/*"
 
       - name: Deployment summary
         if: always()

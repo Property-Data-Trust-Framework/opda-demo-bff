@@ -1,0 +1,9 @@
+{
+  "name": "opda-demo-spa",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "preview": "npx serve src"
+  }
+}
