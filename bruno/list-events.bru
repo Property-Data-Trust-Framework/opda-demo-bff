@@ -1,0 +1,30 @@
+meta {
+  name: List Events
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/demo-api/events?limit=10
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response is an array", function() {
+    expect(res.body).to.be.an("array");
+  });
+
+  test("events have expected shape", function() {
+    if (res.body.length > 0) {
+      var evt = res.body[0];
+      expect(evt).to.have.property("eventId");
+      expect(evt).to.have.property("rawBody");
+      expect(evt).to.have.property("receivedAt");
+    }
+  });
+}

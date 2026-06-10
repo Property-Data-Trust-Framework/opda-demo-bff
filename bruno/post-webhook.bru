@@ -1,0 +1,36 @@
+meta {
+  name: Post Webhook Event
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/webhook
+  body: text
+  auth: none
+}
+
+body:text {
+  eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJldmVudFR5cGUiOiJjb252ZXlhbmNpbmcudHJhbnNhY3Rpb24uY3JlYXRlZCIsInRyYW5zYWN0aW9uSWQiOiJ0ZXN0LTEyMyIsInVwcm4iOiIxMDAwMjMzMzY5NTgiLCJpYXQiOjE3NDk1MDAwMDAsImlzcyI6Imh0dHBzOi8vc21vb3ZlLmV4YW1wbGUuY29tIn0.fake-signature-for-smoke-test
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response contains eventId", function() {
+    expect(res.body).to.have.property("eventId");
+    expect(res.body.eventId).to.be.a("string").and.not.be.empty;
+  });
+
+  test("status is stored", function() {
+    expect(res.body.status).to.equal("stored");
+  });
+}
+
+script:after-response {
+  if (res.status === 200 && res.body.eventId) {
+    bru.setEnvVar("eventId", res.body.eventId);
+  }
+}

@@ -3,7 +3,7 @@ using OpdaDemoBff.Config;
 using OpdaDemoBff.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
+builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(o => o.TimestampFormat = "yyyy-MM-ddTHH:mm:ssZ");
 

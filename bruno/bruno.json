@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "opda-demo-bff",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

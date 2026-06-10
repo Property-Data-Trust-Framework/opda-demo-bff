@@ -1,0 +1,30 @@
+meta {
+  name: Get Event by ID
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/demo-api/events/{{eventId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("eventId matches", function() {
+    expect(res.body.eventId).to.equal(bru.getEnvVar("eventId"));
+  });
+
+  test("event has rawBody", function() {
+    expect(res.body).to.have.property("rawBody");
+    expect(res.body.rawBody).to.be.a("string").and.not.be.empty;
+  });
+
+  test("event has receivedAt", function() {
+    expect(res.body).to.have.property("receivedAt");
+  });
+}
