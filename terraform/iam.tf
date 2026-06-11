@@ -33,6 +33,7 @@ resource "aws_iam_role_policy" "lambda_ssm" {
         aws_ssm_parameter.smoove_api_key.arn,
         aws_ssm_parameter.opda_client_cert.arn,
         aws_ssm_parameter.opda_client_key.arn,
+        aws_ssm_parameter.opda_signing_key.arn,
       ]
     }]
   })

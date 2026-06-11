@@ -17,6 +17,16 @@ resource "aws_lambda_function" "app" {
       OPDA_API_BASE_URL      = var.opda_api_base_url
       OPDA_CLIENT_CERT_PATH  = aws_ssm_parameter.opda_client_cert.name
       OPDA_CLIENT_KEY_PATH   = aws_ssm_parameter.opda_client_key.name
+      OPDA_SIGNING_KEY_PATH  = aws_ssm_parameter.opda_signing_key.name
+      OPDA_CLIENT_ID         = var.opda_client_id
+      OPDA_TOKEN_ENDPOINT    = "https://matls-auth.directory.pdtf.raidiam.io/token"
+      OPDA_SCOPE             = "land-registry"
+      VMC_BASE_URL            = var.vmc_base_url
+      VMC_SCOPE               = "transaction-status"
+      PDI_BASE_URL            = var.pdi_base_url
+      PDI_SCOPE               = "property-pack"
+      SPRIFT_BASE_URL         = var.sprift_base_url
+      SPRIFT_SCOPE            = var.sprift_scope
       DynamoConfig__TableName = aws_dynamodb_table.webhook_events.name
     }
   }

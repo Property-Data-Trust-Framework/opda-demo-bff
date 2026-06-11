@@ -10,6 +10,17 @@ let state = { role:'agent', view:'flows', flags:{}, fired:{}, gates:{}, id:{}, s
               addr:null, invited:null, published:null, advid:null, sof:null };
 let firing = null;
 
+// Real data fetched from the BFF — preferred by renderers where available
+let realData = {};
+
+async function bffFetch(path, opts) {
+  try {
+    const res = await fetch(path, opts);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
 /* ---------- BFF live webhook events ---------- */
 let bffEvents = [];
 
@@ -98,6 +109,16 @@ function cascade(){
           const f=firing; firing=null;
           state.flags=state.flags||{}; state.flags[f.role+'.'+f.id]={time:nowHM()};
           const node=nodeById(f.role,f.id); if(node.effect) node.effect();
+          // Trigger real BFF calls for auto nodes that have API counterparts
+          if(f.role==='agent'&&f.id==='uprn'){
+            bffFetch('/demo-api/uprn/100091225620').then(r=>{ if(r){ realData.uprn=r; renderFlow(); } });
+          }
+          if(f.role==='agent'&&f.id==='pack'){
+            bffFetch('/demo-api/pack/100091225620').then(r=>{ if(r){ realData.pack=r; renderFlow(); } });
+          }
+          if(f.role==='seller'&&f.id==='packSourced'){
+            bffFetch('/demo-api/pdi/pack/100091225620').then(r=>{ if(r){ realData.sellerPack=r; renderFlow(); } });
+          }
           persist(); render(); cascade();
         }, 760);
         return;
@@ -297,23 +318,77 @@ function chainStatus(){
   if(state.addr) return ['Onboarding',''];
   return ['Preparing',''];
 }
+// Map VMC milestone labels to a display status for the "our sale" chain link.
+const VMC_MILESTONE_STATUS = {
+  ‘Completion’:          [‘Completed’,         ‘ok’],
+  ‘Completion Date Set’: [‘Completion set’,    ‘’],
+  ‘Exchange’:            [‘Exchanged’,         ‘’],
+  ‘Mortgage Offered’:    [‘Mortgage offered’,  ‘’],
+  ‘Mortgage Applied’:    [‘Mortgage applied’,  ‘’],
+  ‘Searches Ordered’:    [‘Searches ordered’,  ‘’],
+  ‘Cash Buyer’:          [‘Cash buyer’,        ‘’],
+  ‘SSTC’:                [‘SSTC’,              ‘’],
+  ‘Fall Through’:        [‘Fallen through’,    ‘warn’],
+};
+function vmcStatus(){
+  const chain = realData.chain?.data?.data?.[0];
+  if(!chain) return null;
+  const milestones = chain.milestones || [];
+  if(!milestones.length) return null;
+  const latest = [...milestones].sort((a,b)=> b.date > a.date ? 1 : -1)[0];
+  return VMC_MILESTONE_STATUS[latest.label] ?? [latest.label, ‘’];
+}
 function renderChain(){
-  const m=document.getElementById('chainMount'); if(!m) return;
-  const [st,ok]=chainStatus();
-  const arrow=`<div class="carrow">${svg('handoff',1.8)}</div>`;
-  m.innerHTML = `
-  <div class="card chaincard s12">
-    <div class="chead"><span class="ct">Property chain — visible to every role</span><span class="partnertag">${svg('info',2)} integration partner · no OPDA API</span></div>
-    <div class="chain">
+  const m=document.getElementById(‘chainMount’); if(!m) return;
+  const demoSt = chainStatus();
+  const vmcSt  = vmcStatus();
+  // Prefer VMC milestone as the "our sale" status; fall back to demo state.
+  const [st,ok] = vmcSt ?? demoSt;
+  const chain   = realData.chain?.data?.data?.[0];
+  const arrow   = `<div class="carrow">${svg(‘handoff’,1.8)}</div>`;
+  const isLive  = !!chain;
+  const chainTypeTag = chain
+    ? `<span class="partnertag">${svg(‘check’,2)} ViewMyChain · live</span>`
+    : `<span class="partnertag">${svg(‘info’,2)} ViewMyChain · integration partner</span>`;
+
+  // Build chain links — use real properties if available, otherwise mock 4-link layout.
+  let links=’’;
+  if(chain && chain.properties && chain.properties.length){
+    const props = chain.properties;
+    const isBottom = chain.isBottomClosed;
+    const isTop    = chain.isTopClosed;
+    props.forEach((p,i)=>{
+      const isOurs = p.uprn === ‘100091225620’;
+      const addr   = p.address || p.displayAddress || `Property ${i+1}`;
+      const sub    = isOurs ? ‘this sale’
+                   : i===0 && isBottom ? ‘no chain below’
+                   : i===props.length-1 && isTop ? ‘vacant possession’
+                   : ‘in chain’;
+      const statTxt= isOurs ? st : ‘’;
+      const statCls= isOurs ? ok : ‘’;
+      const cls    = isOurs ? ‘ours’ : ‘’;
+      links += `<div class="clink ${cls}"><span class="cpos">${i+1}</span><b>${addr}</b><span class="csub">${sub}</span>${statTxt?`<span class="cstat ${statCls}">${statTxt}</span>`:’’}</div>`;
+      if(i<props.length-1) links+=arrow;
+    });
+  } else {
+    // Mock fallback
+    links = `
       <div class="clink"><span class="cpos">1</span><b>First-time buyer</b><span class="csub">no chain below</span><span class="cstat ok">ready</span></div>
       ${arrow}
       <div class="clink ours"><span class="cpos">2</span><b>14 Elm Grove</b><span class="csub">this sale</span><span class="cstat ${ok}">${st}</span></div>
       ${arrow}
       <div class="clink"><span class="cpos">3</span><b>Onward purchase</b><span class="csub">seller buying on</span><span class="cstat">offer accepted</span></div>
       ${arrow}
-      <div class="clink"><span class="cpos">4</span><b>Top of chain</b><span class="csub">vacant possession</span><span class="cstat ok">no onward</span></div>
-    </div>
-    <div class="note" style="margin-top:14px;"><span class="ni">${svg('info')}</span><div>No OPDA API yet — chain position &amp; status are supplied by an <b>integration partner</b>, populated alongside the agent’s material information (timing TBA). Every role sees the same chain; <b>our sale</b>’s status tracks the live transaction.</div></div>
+      <div class="clink"><span class="cpos">4</span><b>Top of chain</b><span class="csub">vacant possession</span><span class="cstat ok">no onward</span></div>`;
+  }
+  const note = isLive
+    ? `<div class="note" style="margin-top:14px;"><span class="ni">${svg(‘check’)}</span><div>Chain data supplied live by <b>ViewMyChain</b> via the PDTF <code>transaction-status</code> API. Milestones update automatically via webhook. Every role sees the same chain.</div></div>`
+    : `<div class="note" style="margin-top:14px;"><span class="ni">${svg(‘info’)}</span><div>Chain data will be supplied by <b>ViewMyChain</b> once the address is resolved. Every role sees the same chain; <b>our sale</b>’s status tracks the live transaction.</div></div>`;
+  m.innerHTML = `
+  <div class="card chaincard s12">
+    <div class="chead"><span class="ct">Property chain — visible to every role</span>${chainTypeTag}</div>
+    <div class="chain">${links}</div>
+    ${note}
   </div>`;
 }
 function updateTopSearch(){
@@ -340,7 +415,8 @@ function buildStream(){
   if(flagDone('agent.uprn')) L.push([state.flags['agent.uprn'].time,'uprn.validated','Agent']);
   if(state.invited) L.push([state.invited.time,'identity.invite.sent','Agent']);
   if(state.id.seller) L.push([state.id.seller.time,'seller.identity.verified','Seller']);
-  if(flagDone('agent.pack')) L.push([state.flags['agent.pack'].time,'pack.sourced','Agent']);
+  if(flagDone('agent.pack')) L.push([state.flags['agent.pack'].time,'listing.info.sourced','Agent']);
+  if(flagDone('seller.packSourced')) L.push([state.flags['seller.packSourced'].time,'property.pack.sourced','Seller']);
   if(state.advid) L.push([state.advid.time,'seller.identity.advanced','Seller']);
   if(flagDone('agent.ready')) L.push([state.flags['agent.ready'].time,'listing.details.ready','Agent']);
   if(state.published) L.push([state.published.time,'listing.published','Agent']);
@@ -414,7 +490,14 @@ function sync(){ render(); persist(); cascade(); }
 function setRole(id){ state.role=id; render(); persist(); }
 function mark(key){ state.lastKey=key; }
 
-function searchAddress(){ if(state.addr) return; state.addr={time:nowHM()}; mark(state.addr.time+'|places.address.resolved'); sync(); }
+function searchAddress(){
+  if(state.addr) return;
+  state.addr={time:nowHM()}; mark(state.addr.time+'|places.address.resolved'); sync();
+  bffFetch('/demo-api/address?q='+encodeURIComponent('14 Elm Grove, Bristol BS6 5DB'))
+    .then(r=>{ if(r){ realData.address=r; renderFlow(); } });
+  bffFetch('/demo-api/chain/100091225620')
+    .then(r=>{ if(r){ realData.chain=r; renderChain(); } });
+}
 function resetSearch(){ state.addr=null; sync(); }
 function inviteSeller(){ if(state.invited) return; state.invited={time:nowHM()}; mark(state.invited.time+'|identity.invite.sent'); sync(); }
 function resetInvite(){ state.invited=null; sync(); }
@@ -424,9 +507,17 @@ function submitId(role){ state.id[role]={time:nowHM()}; mark(state.id[role].time
 function editId(role){ state.id[role]=null; sync(); }
 function submitAdvId(){ state.advid={time:nowHM()}; mark(state.advid.time+'|seller.identity.advanced'); sync(); }
 function resetAdvId(){ state.advid=null; sync(); }
-function traceFunds(){ state.sof={time:nowHM()}; mark(state.sof.time+'|funds.traced'); sync(); }
+function traceFunds(){
+  state.sof={time:nowHM()}; mark(state.sof.time+'|funds.traced'); sync();
+  bffFetch('/demo-api/source-of-funds', {method:'POST'})
+    .then(r=>{ if(r){ realData.sof=r; renderFlow(); } });
+}
 function resetFunds(){ state.sof=null; sync(); }
-function retrieveSurveys(role){ state.surv[role]={time:nowHM()}; mark(state.surv[role].time+'|documents.surveys.retrieved'); sync(); }
+function retrieveSurveys(role){
+  state.surv[role]={time:nowHM()}; mark(state.surv[role].time+'|documents.surveys.retrieved'); sync();
+  bffFetch('/demo-api/surveys/100091225620')
+    .then(r=>{ if(r){ realData.surveys=r; renderFlow(); } });
+}
 function requestPack(gate){ const c=state.gates[gate]||{}; if(c.status==='granted') return; state.gates[gate]={status:'requested',reqTime:nowHM(),decTime:null}; mark(state.gates[gate].reqTime+'|consent.requested'); sync(); }
 function decideConsent(gate,ok){ const c=state.gates[gate]||{}; state.gates[gate]={status:ok?'granted':'denied',reqTime:c.reqTime,decTime:nowHM(),by:state.role}; mark(state.gates[gate].decTime+'|seller.consent.'+(ok?'granted':'denied')); sync(); }
 function revokeConsent(gate){ const c=state.gates&&state.gates[gate]; if(!c) return; state.gates[gate]={status:'requested',reqTime:c.reqTime||nowHM(),decTime:null}; mark(null); sync(); }

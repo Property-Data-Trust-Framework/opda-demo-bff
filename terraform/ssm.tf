@@ -21,3 +21,11 @@ resource "aws_ssm_parameter" "opda_client_key" {
   overwrite = true
   tags      = local.tags
 }
+
+resource "aws_ssm_parameter" "opda_signing_key" {
+  name      = "/${local.name_prefix}/opda_signing_key"
+  type      = "SecureString"
+  value     = var.opda_signing_key
+  overwrite = true
+  tags      = local.tags
+}

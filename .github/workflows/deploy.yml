@@ -35,9 +35,11 @@ jobs:
       TF_VAR_github_repo:       ${{ github.repository }}
       TF_VAR_image_tag:         ${{ github.sha }}
       TF_VAR_smoove_api_key:    ${{ secrets.SMOOVE_API_KEY }}
-      TF_VAR_opda_client_cert:  ${{ secrets.OPDA_CLIENT_CERT }}
-      TF_VAR_opda_client_key:   ${{ secrets.OPDA_CLIENT_KEY }}
-      TF_VAR_opda_api_base_url: ${{ vars.OPDA_API_BASE_URL }}
+      TF_VAR_opda_client_cert:   ${{ secrets.OPDA_CLIENT_CERT }}
+      TF_VAR_opda_client_key:    ${{ secrets.OPDA_CLIENT_KEY }}
+      TF_VAR_opda_api_base_url:  ${{ vars.OPDA_API_BASE_URL }}
+      TF_VAR_opda_signing_key:   ${{ secrets.OPDA_SIGNING_KEY }}
+      TF_VAR_opda_client_id:     ${{ vars.OPDA_CLIENT_ID }}
 
     permissions:
       id-token: write

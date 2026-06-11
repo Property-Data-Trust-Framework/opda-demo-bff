@@ -321,7 +321,7 @@ function reviewBody(){
    ============================================================ */
 const ROLES = [
   { id:'agent', n:'Role 0', name:'Seller Estate Agent', icon:'key', avatar:'key',
-    desc:'Triggers the whole transaction. Captures the property, invites the seller to verify, auto-sources the pack once the UPRN validates, and publishes the listing when every detail is ready.',
+    desc:'Triggers the whole transaction. Captures the property, invites the seller to verify, auto-sources listing information once the UPRN validates, and publishes when every detail is ready.',
     stats:[{v:'6',l:'graph steps'},{v:'8',l:'APIs touched'},{v:'auto',l:'sourcing',ok:true}],
     nodes:[
       {id:'enter',kind:'input',ln:'Enter property',sub:'& resolve',api:'GET /v1/places · /uprn/validate',
@@ -330,14 +330,31 @@ const ROLES = [
       {id:'invite',kind:'input',ln:'Invite seller',sub:'(ID link)',api:'POST /identity/invite',
         prereqs:['enter'], done:()=>!!state.invited, lock:'capture the property first', body:inviteBody},
       {id:'uprn',kind:'auto',ln:'Validate UPRN',api:'GET /v1/uprn/validate',prereqs:['invite'],
-        fired:()=>`<span class="chip">${seal('ok','sm')}UPRN <b class="mono" style="margin-left:3px">10009 12345</b> validated</span>`,
+        fired:()=>{
+          const u=typeof realData!=='undefined'&&realData.uprn;
+          const uprn=u?.data?.uprn??'10009 12345';
+          return `<span class="chip">${seal('ok','sm')}UPRN <b class="mono" style="margin-left:3px">${uprn}</b> validated</span>`;
+        },
         pend:'fires automatically once the seller is invited'},
-      {id:'pack',kind:'auto',ln:'Source pack',api:'GET EPC · council-tax · coalfield · register-extract',prereqs:['uprn'],
-        fired:()=>`<div class="chips"><span class="chip">${seal('ok','sm')}EPC C · 72</span><span class="chip">${seal('warn','sm')}Council tax D</span><span class="chip">${seal('ok','sm')}Coalfield OFF</span><span class="chip">${seal('ok','sm')}Freehold</span></div>`,
-        pend:'auto-sources the material information once the UPRN validates'},
-      {id:'ready',kind:'merge',ln:'All details ready',api:'internal',prereqs:['pack','@seller_id'],
-        fired:()=>`<span class="chip">${seal('ok','sm')}All material details assembled — listing is sale-ready</span>`,
-        pend:'needs the pack sourced and the seller’s ID verified'},
+      {id:’pack’,kind:’auto’,ln:’Gather listing info’,api:’GET EPC · council-tax · coalfield · title’,prereqs:[‘uprn’],
+        fired:()=>{
+          const p=typeof realData!==’undefined’&&realData.pack;
+          const epcBand=p?.epc?.data?.currentEnergyEfficiencyBand??’C’;
+          const epcScore=p?.epc?.data?.currentEnergyEfficiencyScore??72;
+          const ctBand=p?.councilTax?.data?.band??’D’;
+          const coalStatus=p?.coalfield?.data?.status??’OFF’;
+          const tenure=p?.titleRegister?.data?.OCSummaryData?.TitleDetails?.TenureType??’Freehold’;
+          return `<div class="chips">
+            <span class="chip">${seal(‘ok’,’sm’)}EPC ${epcBand} · ${epcScore}</span>
+            <span class="chip">${seal(ctBand===’D’?’warn’:’ok’,’sm’)}Council tax ${ctBand}</span>
+            <span class="chip">${seal(‘ok’,’sm’)}Coalfield ${coalStatus}</span>
+            <span class="chip">${seal(‘ok’,’sm’)}${tenure}</span>
+          </div>`;
+        },
+        pend:’auto-sources listing information once the UPRN validates’},
+      {id:’ready’,kind:’merge’,ln:’All details ready’,api:’internal’,prereqs:[‘pack’,’@seller_id’],
+        fired:()=>`<span class="chip">${seal(‘ok’,’sm’)}All listing information assembled — property is sale-ready</span>`,
+        pend:’needs listing info gathered and the seller’s ID verified’},
       {id:'publish',kind:'input',ln:'Publish listing',api:'— export / portal',prereqs:['ready'],
         done:()=>!!state.published, lock:'unlocks once all details are ready', body:publishBody}
     ],
@@ -346,26 +363,37 @@ const ROLES = [
   },
 
   { id:'seller', n:'Role 1', name:'Seller', icon:'home', avatar:'home',
-    desc:'Proves identity once the agent invites them, completes an advanced ID check for the conveyancer, and — when a verified buyer asks — confirms release of the Property Pack.',
-    stats:[{v:'3',l:'graph steps'},{v:'2',l:'ID checks',ok:true},{v:'JIT',l:'consent',ok:true}],
+    desc:'Proves identity, sources their own Property Pack (via Sprift / PDI), completes advanced ID for the conveyancer, and — when a verified buyer asks — releases the pack via the consent gate.',
+    stats:[{v:'5',l:'graph steps'},{v:'2',l:'ID checks',ok:true},{v:'JIT',l:'consent',ok:true}],
     nodes:[
       {id:'start',kind:'origin',ln:'Sale opened'},
       {id:'verify',kind:'input',ln:'Verify identity',api:'POST /identity/verify',prereqs:['@invite_recv'],
         done:()=>!!(state.id&&state.id.seller),
         body:()=>grid({type:'idform',role:'seller',title:'Identity details',span:7},{type:'note',span:5,text:'Every identity result carries a <b>signature block</b>, so downstream roles trust it without re-checking. <b>Demo only</b> — entered data goes nowhere.'})},
       {id:'shared',kind:'auto',ln:'Identity shared',sub:'signed',api:'internal',prereqs:['verify'],
-        fired:()=>`<span class="chip">${seal('ok','sm')}Signed identity result shared to the pack</span>`,
+        fired:()=>`<span class="chip">${seal('ok','sm')}Signed identity result shared and verified on-chain</span>`,
         pend:'emitted automatically once you verify'},
       {id:'advid',kind:'input',ln:'Advanced ID',sub:'verification',api:'POST /identity/verify · enhanced',prereqs:['shared'],
         done:()=>!!state.advid, lock:'complete your initial verification first', body:advidBody},
-      {id:'consent',kind:'input',ln:'Grant consent',api:'POST /consent/release-pack',prereqs:['shared','@buyer_req'],openOnReach:true,
+      {id:'packSourced',kind:'auto',ln:'Property pack sourced',sub:'Sprift / PDI',api:'POST /property-pack/uprn',prereqs:['advid'],
+        fired:()=>{
+          const p=typeof realData!=='undefined'&&realData.sellerPack;
+          if(p&&p.propertyPack){
+            const epc=p.propertyPack.energyEfficiency?.epcRating??'C';
+            const ct=p.propertyPack.councilTax?.band??'D';
+            return `<div class="chips"><span class="chip">${seal('ok','sm')}Property pack sourced</span><span class="chip">${seal('ok','sm')}EPC ${epc}</span><span class="chip">${seal('ok','sm')}Council tax ${ct}</span></div>`;
+          }
+          return `<span class="chip">${seal('ok','sm')}Property pack sourced and sealed — ready to release to buyers</span>`;
+        },
+        pend:'auto-sources the full property pack once advanced ID is verified'},
+      {id:'consent',kind:'input',ln:'Grant consent',api:'POST /consent/release-pack',prereqs:['packSourced','@buyer_req'],openOnReach:true,
         done:()=>gateReleased('seller_consent'), body:()=>grid({type:'consentInbound',gate:'seller_consent'})}
     ],
     branches:[
       {id:'invite_recv',label:'Invite from Agent',from:'start',to:'verify',party:'Agent',tab:'agent',
         active:()=>true, resolved:()=>!!state.invited},
-      {id:'buyer_req',label:'Buyer requested pack',from:'shared',to:'consent',party:'Buyer',tab:'buyer',
-        active:()=>flagDone('seller.shared'), resolved:()=>reqDone()}
+      {id:'buyer_req',label:'Buyer requested pack',from:'packSourced',to:'consent',party:'Buyer',tab:'buyer',
+        active:()=>flagDone('seller.packSourced'), resolved:()=>reqDone()}
     ]
   },
 

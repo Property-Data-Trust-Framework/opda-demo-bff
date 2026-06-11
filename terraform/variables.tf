@@ -56,3 +56,44 @@ variable "opda_api_base_url" {
   type    = string
   default = "https://dev.api.smartpropdata.org.uk"
 }
+
+variable "opda_signing_key" {
+  type        = string
+  description = "PEM RSA private key for private_key_jwt token requests to Raidiam"
+  sensitive   = true
+  default     = ""
+}
+
+variable "opda_client_id" {
+  type    = string
+  default = "https://rp.directory.pdtf.raidiam.io/openid_relying_party/70e31a1a-054d-4eb7-99eb-2ef4a78c1b0d"
+}
+
+# ── ViewMyChain ───────────────────────────────────────────────────────────────
+
+variable "vmc_base_url" {
+  type    = string
+  default = "https://admin.demo3.viewmychain.com"
+}
+
+# ── Property Deals Insight ────────────────────────────────────────────────────
+
+variable "pdi_base_url" {
+  type    = string
+  default = "https://sandbox-pdtf.propertydealsinsight.com"
+}
+
+# ── Sprift ────────────────────────────────────────────────────────────────────
+# PDTF sandbox base URL and scope to be confirmed from Alan Hughes / Sprift call
+# on 2026-06-11. Commercial API base (for reference): https://sprift.com/dashboard/api/v1
+# Paths derived from commercial spec should hold; base URL and scope will differ.
+
+variable "sprift_base_url" {
+  type    = string
+  default = ""
+}
+
+variable "sprift_scope" {
+  type    = string
+  default = ""
+}
