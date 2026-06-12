@@ -13,6 +13,10 @@ let firing = null;
 // Real data fetched from the BFF — preferred by renderers where available
 let realData = {};
 
+function resolvedUprn(){
+  return (typeof realData!=='undefined' && realData.address?.data?.[0]?.uprn) || '100091225620';
+}
+
 async function bffFetch(path, opts) {
   try {
     const res = await fetch(path, opts);
@@ -111,13 +115,13 @@ function cascade(){
           const node=nodeById(f.role,f.id); if(node.effect) node.effect();
           // Trigger real BFF calls for auto nodes that have API counterparts
           if(f.role==='agent'&&f.id==='uprn'){
-            bffFetch('/demo-api/uprn/100091225620').then(r=>{ if(r){ realData.uprn=r; renderFlow(); } });
+            bffFetch(`/demo-api/uprn/${resolvedUprn()}`).then(r=>{ if(r){ realData.uprn=r; renderFlow(); initMap(); } });
           }
           if(f.role==='agent'&&f.id==='pack'){
-            bffFetch('/demo-api/pack/100091225620').then(r=>{ if(r){ realData.pack=r; renderFlow(); } });
+            bffFetch(`/demo-api/pack/${resolvedUprn()}`).then(r=>{ if(r){ realData.pack=r; renderFlow(); } });
           }
           if(f.role==='seller'&&f.id==='packSourced'){
-            bffFetch('/demo-api/property-pack/100091225620').then(r=>{ if(r){ realData.sellerPack=r; renderFlow(); } });
+            bffFetch(`/demo-api/property-pack/${resolvedUprn()}`).then(r=>{ if(r){ realData.sellerPack=r; renderFlow(); } });
           }
           persist(); render(); cascade();
         }, 760);
@@ -343,7 +347,7 @@ function chainLinks(){
   const chain=typeof realData!==’undefined’&&realData.chain?.data?.data?.[0];
   if(chain&&chain.properties&&chain.properties.length){
     return chain.properties.map(p=>{
-      const isOurs=p.uprn===’100091225620’;
+      const isOurs=p.uprn===resolvedUprn();
       return {name:p.address||p.displayAddress||’Property’,sub:isOurs?’this sale’:’’,
               stat:isOurs?(vmcSt?vmcSt[0]:st):’’,tone:isOurs?(vmcSt?vmcSt[1]:ok):’’,ours:isOurs};
     });
@@ -395,8 +399,10 @@ function updateTopSearch(){
   const s=document.getElementById('topSearch'); if(!s) return;
   if(state.addr){
     s.classList.remove('empty');
-    document.getElementById('topAddr').textContent='14 Elm Grove, Redland';
-    document.getElementById('topSub').textContent='· Bristol BS6 5DB';
+    const addrLine = (typeof realData!=='undefined' && realData.address?.data?.[0]?.address) || '';
+    const addrParts = addrLine ? addrLine.split(',') : [];
+    document.getElementById('topAddr').textContent = addrParts.length ? addrParts[0].trim() : '14 Elm Grove';
+    document.getElementById('topSub').textContent = addrParts.length > 1 ? '· ' + addrParts.slice(1).join(',').trim() : '· Redland, Bristol';
     document.getElementById('topUprn').style.display='';
   } else {
     s.classList.add('empty');
@@ -604,13 +610,35 @@ function inspectPayload(id){
     el.classList.add('plflash'); setTimeout(()=>el.classList.remove('plflash'),1500);
   }
 }
+let _map = null;
+function initMap(){
+  const el = document.getElementById('leaflet-map');
+  if(!el || !window.L) return;
+  const lat = (typeof realData!=='undefined' && realData.uprn?.data?.lat) || 51.4712;
+  const lng = (typeof realData!=='undefined' && realData.uprn?.data?.lng) || -2.6003;
+  if(_map){ _map.remove(); _map = null; }
+  _map = L.map(el, { zoomControl:true, attributionControl:true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom:19
+  }).addTo(_map);
+  delete L.Icon.Default.prototype._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  });
+  L.marker([lat, lng]).addTo(_map);
+  _map.setView([lat, lng], 16);
+}
+
 function setView(v){
   state.view=v;
   document.querySelectorAll('#viewseg button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
   document.getElementById('flowsView').classList.toggle('active',v==='flows');
   document.getElementById('passportView').classList.toggle('active',v==='passport');
   document.getElementById('payloadsView').classList.toggle('active',v==='payloads');
-  if(v==='passport') renderPassport();
+  if(v==='passport'){ renderPassport(); initMap(); }
   if(v==='payloads') renderPayloads();
   persist();
 }
@@ -630,11 +658,20 @@ function resetAll(){
 
 function searchAddress(){
   if(state.addr) return;
+  const q = document.getElementById('addrInput')?.value?.trim() || '14 Elm Grove, Bristol BS6 5DB';
   state.addr={time:nowHM()}; mark(state.addr.time+'|places.address.resolved'); sync();
-  bffFetch('/demo-api/address?q='+encodeURIComponent('14 Elm Grove, Bristol BS6 5DB'))
-    .then(r=>{ if(r){ realData.address=r; renderFlow(); } });
-  bffFetch('/demo-api/chain/100091225620')
-    .then(r=>{ if(r){ realData.chain=r; renderChain(); } });
+  bffFetch('/demo-api/address?q='+encodeURIComponent(q))
+    .then(r=>{
+      if(r){
+        realData.address=r;
+        renderFlow();
+        const uprn = r.data?.[0]?.uprn || '100091225620';
+        const el = document.getElementById('topUprn');
+        if(el) el.textContent = 'UPRN ' + uprn;
+        bffFetch(`/demo-api/chain/${uprn}`)
+          .then(cr=>{ if(cr){ realData.chain=cr; renderChain(); } });
+      }
+    });
 }
 function resetSearch(){ state.addr=null; sync(); }
 function inviteSeller(){ if(state.invited) return; state.invited={time:nowHM()}; mark(state.invited.time+'|identity.invite.sent'); sync(); }
@@ -653,7 +690,7 @@ function traceFunds(){
 function resetFunds(){ state.sof=null; sync(); }
 function retrieveSurveys(role){
   state.surv[role]={time:nowHM()}; mark(state.surv[role].time+'|documents.surveys.retrieved'); sync();
-  bffFetch('/demo-api/surveys/100091225620')
+  bffFetch(`/demo-api/surveys/${resolvedUprn()}`)
     .then(r=>{ if(r){ realData.surveys=r; renderFlow(); } });
 }
 function requestPack(gate){ const c=state.gates[gate]||{}; if(c.status==='granted') return; state.gates[gate]={status:'requested',reqTime:nowHM(),decTime:null}; mark(state.gates[gate].reqTime+'|consent.requested'); sync(); }
@@ -680,7 +717,11 @@ document.body.addEventListener('click',e=>{
   const jl=e.target.closest('.jumplink[data-jump]'); if(jl){ setRole(jl.dataset.jump); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const jump=e.target.closest('[data-jump]'); if(jump){ setRole(jump.dataset.jump); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const node=e.target.closest('[data-node]'); if(node){ const p=document.getElementById('np-'+node.dataset.node); if(p) p.scrollIntoView({behavior:'smooth',block:'center'}); return; }
-  if(e.target.closest('[data-search]')){ searchAddress(); return; }
+  if(e.target.closest('[data-search]')){
+    const sugg=e.target.closest('.sugg');
+    if(sugg){ const inp=document.getElementById('addrInput'); if(inp) inp.value=sugg.textContent.trim(); }
+    searchAddress(); return;
+  }
   if(e.target.closest('[data-searchreset]')){ resetSearch(); return; }
   if(e.target.closest('[data-invite]')){ inviteSeller(); return; }
   if(e.target.closest('[data-invitereset]')){ resetInvite(); return; }

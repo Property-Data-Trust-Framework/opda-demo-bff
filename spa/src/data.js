@@ -118,11 +118,7 @@ const Blocks = {
   map(b){
     return `<div class="card s${b.span||6} mapcard">
       ${b.title?`<div class="chead"><span class="ct">${b.title}</span></div>`:''}
-      <div class="mapph">
-        <span class="plot"></span>
-        <span class="mapmark"><span class="ring r1"></span><span class="ring r2"></span><span class="shadow"></span><span class="pin">${svg('pin')}</span></span>
-        <span class="cap">UPRN 10009 12345 · 51.47°N, 2.60°W</span>
-      </div>
+      <div id="leaflet-map" style="height:200px;border-radius:8px;overflow:hidden;"></div>
     </div>`;
   },
   stream(b){
@@ -148,11 +144,14 @@ const Blocks = {
   },
   search(b){
     if(state.addr){
-      return card(b,`<div class="resolved"><div class="bigaddr">14 Elm Grove, Redland, Bristol BS6 5DB</div>
-        <div class="chips"><span class="chip">${seal('ok','sm')}UPRN <b class="mono" style="margin-left:3px">10009 12345</b></span><span class="chip">format valid · resolved ${state.addr.time}</span></div>
+      const addrData = typeof realData!=='undefined' && realData.address?.data?.[0];
+      const displayAddr = addrData?.address || '14 Elm Grove, Redland, Bristol BS6 5DB';
+      const displayUprn = addrData?.uprn || '—';
+      return card(b,`<div class="resolved"><div class="bigaddr">${displayAddr}</div>
+        <div class="chips"><span class="chip">${seal('ok','sm')}UPRN <b class="mono" style="margin-left:3px">${displayUprn}</b></span><span class="chip">format valid · resolved ${state.addr.time}</span></div>
         <div style="margin-top:13px;"><button class="linkbtn" data-searchreset>${svg('refresh',2)} new search</button></div></div>`);
     }
-    return card(b,`<div class="searchwrap"><div class="searchin"><span class="ico">${svg('search',2)}</span><input placeholder="Search an address or postcode…  e.g. 14 Elm Grove, Bristol BS6"></div><button class="btn" data-search>${svg('search',2)} Search</button></div>
+    return card(b,`<div class="searchwrap"><div class="searchin"><span class="ico">${svg('search',2)}</span><input id="addrInput" placeholder="Search an address or postcode…  e.g. 14 Elm Grove, Bristol BS6"></div><button class="btn" data-search>${svg('search',2)} Search</button></div>
       <div class="sugg-row">try:<button class="sugg" data-search>14 Elm Grove, Bristol BS6 5DB</button></div>`);
   },
   surveys(b){
@@ -332,8 +331,7 @@ const ROLES = [
         prereqs:['enter'], done:()=>!!state.invited, lock:'capture the property first', body:inviteBody},
       {id:'uprn',kind:'auto',ln:'Validate UPRN',api:'GET /v1/uprn/validate',prereqs:['invite'],
         fired:()=>{
-          const u=typeof realData!=='undefined'&&realData.uprn;
-          const uprn=u?.data?.uprn??'10009 12345';
+          const uprn=(typeof realData!=='undefined'&&realData.address?.data?.[0]?.uprn)||'—';
           return `<span class="chip">${seal('ok','sm')}UPRN <b class="mono" style="margin-left:3px">${uprn}</b> validated</span>`;
         },
         pend:'fires automatically once the seller is invited'},

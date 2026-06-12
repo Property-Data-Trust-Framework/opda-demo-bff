@@ -40,6 +40,7 @@ jobs:
       TF_VAR_opda_api_base_url:  ${{ vars.OPDA_API_BASE_URL }}
       TF_VAR_opda_signing_key:   ${{ secrets.OPDA_SIGNING_KEY }}
       TF_VAR_opda_client_id:     ${{ vars.OPDA_CLIENT_ID }}
+      TF_VAR_sprift_api_key:     ${{ secrets.SPRIFT_API_KEY }}
 
     permissions:
       id-token: write

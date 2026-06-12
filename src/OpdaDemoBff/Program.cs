@@ -185,7 +185,8 @@ app.MapGet("/demo-api/surveys/{uprn}", async (string uprn, IOpdaClient opda) =>
 
 app.MapPost("/demo-api/source-of-funds", async (IOpdaClient opda) =>
 {
-    var clientRequestId = Guid.NewGuid().ToString("N")[..12];
+    var clientRequestId = Environment.GetEnvironmentVariable("ARMALYTIX_CLIENT_REQUEST_ID")
+        ?? Guid.NewGuid().ToString();
     var result = await opda.GetAsync($"/v1/source-of-funds/{clientRequestId}");
     return result is not null ? Results.Ok(result) : Results.StatusCode(502);
 });
