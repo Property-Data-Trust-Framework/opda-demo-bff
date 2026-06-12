@@ -162,7 +162,7 @@ const Blocks = {
     if(done){
       return card(b,`<div class="turnline done">${sealSvg}<span>Surveys retrieved at ${done.time} · <span class="mono">documents.surveys.retrieved</span> streamed</span></div>${docs}<div class="trig-foot"><span class="tf-l">Each survey carries its own provenance seal</span><button class="linkbtn" data-survget="${role}">${svg('refresh',2)} re-fetch</button></div>`);
     }
-    const who = role==='sconv'?'Acting for the seller, pull any surveys filed against the property':'Pull the surveys for your client’s review';
+    const who = role==='sconv'?'Acting for the seller, pull any surveys filed against the property':'Pull the surveys for your client's review';
     return card(b,`<div class="status ok" style="margin-bottom:15px;"><div class="sico" style="background:var(--amber-bg);color:var(--amber-d);border-color:var(--amber-ring)">${svg('doc')}</div><div><div class="stit">Retrieve surveys on demand</div><ul><li>${who}</li><li>Served from the documents service, each with its own seal</li></ul></div></div><button class="btn amber" data-survget="${role}">${svg('download')} Retrieve surveys</button>`);
   },
   consentRequest(b){
@@ -190,7 +190,7 @@ const Blocks = {
     }
     return `<div class="card gatecard s12 gate-rel"><div class="gatebar">
       <span class="gicon">${svg('download')}</span>
-      <div class="gtxt"><div class="gt">Request the Seller’s Property Pack</div>
+      <div class="gtxt"><div class="gt">Request the Seller's Property Pack</div>
         <div class="gs">Sends a just-in-time consent request to the Seller to release their signed pack. Nothing is re-sourced or re-paid — you inherit their seals.</div></div>
       <button class="btn" data-request="${b.gate}">${svg('send')} Request pack</button></div></div>`;
   },
@@ -221,7 +221,7 @@ const Blocks = {
     return `<div class="card gatecard s12 gate-idle"><div class="gatebar">
       <span class="gicon">${svg('clock',2)}</span>
       <div class="gtxt"><div class="gt">No pending consent requests</div>
-        <div class="gs">${g.desc} When a verified buyer requests it, you’ll be prompted to confirm or deny — right here.</div></div>
+        <div class="gs">${g.desc} When a verified buyer requests it, you'll be prompted to confirm or deny — right here.</div></div>
       <span class="ghint">${svg('clock',2)} awaiting request</span></div></div>`;
   }
 };
@@ -248,7 +248,7 @@ const jumpBtn = (tab,label)=>`<button class="jumpbtn" data-jump="${tab}">${label
 /* ---------- custom node bodies ---------- */
 function inviteBody(){
   if(state.invited) return doneCard({title:'ID verification link sent to the seller',
-    lines:[`Sent at <b style="color:var(--ink)">${state.invited.time}</b> via a third-party IDV provider`,'The seller’s “Verify identity” step is now unlocked'],
+    lines:[`Sent at <b style="color:var(--ink)">${state.invited.time}</b> via a third-party IDV provider`,'The seller's “Verify identity” step is now unlocked'],
     jump:jumpBtn('seller','Go to the Seller tab'), reset:'data-invitereset', resetLabel:'re-send'});
   return `<div class="card s12 actcard"><div class="acform">
     <div class="acform-h">${svg('mail')}<div><div class="stit">Invite the seller to verify their identity</div><div class="acsub">In a live deployment this sends a verification link through a third-party IDV provider.</div></div></div>
@@ -296,7 +296,7 @@ function setBody(){
 }
 function actionBody(){
   if(eventFired('completion_actioned')) return doneCard({title:'Completion actioned — funds released',
-    lines:[`Confirmed at <b style="color:var(--ink)">${state.fired.completion_actioned.time}</b> · <code>completion.actioned</code> streamed`,'The Seller Conveyancer’s completion merges closed; the TID auto-registers next'],
+    lines:[`Confirmed at <b style="color:var(--ink)">${state.fired.completion_actioned.time}</b> · <code>completion.actioned</code> streamed`,'The Seller Conveyancer's completion merges closed; the TID auto-registers next'],
     jump:jumpBtn('sconv','Back to the Seller Conveyancer'), reset:'data-eventreset="completion_actioned"', resetLabel:'reset'});
   return actionCard({icon:'shield', amber:true, title:'Action completion',
     sub:'Confirms funds have moved and executes the deal — the matching event for the date the Seller Conveyancer set.', body:'<div class="mono epline">POST /conveyancing-events/completion-actioned</div>',
@@ -335,25 +335,25 @@ const ROLES = [
           return `<span class="chip">${seal('ok','sm')}UPRN <b class="mono" style="margin-left:3px">${uprn}</b> validated</span>`;
         },
         pend:'fires automatically once the seller is invited'},
-      {id:’pack’,kind:’auto’,ln:’Gather listing info’,api:’GET EPC · council-tax · coalfield · title’,prereqs:[‘uprn’],
+      {id:'pack',kind:'auto',ln:'Gather listing info',api:'GET EPC · council-tax · coalfield · title',prereqs:['uprn'],
         fired:()=>{
-          const p=typeof realData!==’undefined’&&realData.pack;
-          const epcBand=p?.epc?.data?.currentEnergyEfficiencyBand??’C’;
+          const p=typeof realData!=='undefined'&&realData.pack;
+          const epcBand=p?.epc?.data?.currentEnergyEfficiencyBand??'C';
           const epcScore=p?.epc?.data?.currentEnergyEfficiencyScore??72;
-          const ctBand=p?.councilTax?.data?.band??’D’;
-          const coalStatus=p?.coalfield?.data?.status??’OFF’;
-          const tenure=p?.titleRegister?.data?.OCSummaryData?.TitleDetails?.TenureType??’Freehold’;
+          const ctBand=p?.councilTax?.data?.band??'D';
+          const coalStatus=p?.coalfield?.data?.status??'OFF';
+          const tenure=p?.titleRegister?.data?.OCSummaryData?.TitleDetails?.TenureType??'Freehold';
           return `<div class="chips">
-            <span class="chip">${seal(‘ok’,’sm’)}EPC ${epcBand} · ${epcScore}</span>
-            <span class="chip">${seal(ctBand===’D’?’warn’:’ok’,’sm’)}Council tax ${ctBand}</span>
-            <span class="chip">${seal(‘ok’,’sm’)}Coalfield ${coalStatus}</span>
-            <span class="chip">${seal(‘ok’,’sm’)}${tenure}</span>
+            <span class="chip">${seal('ok','sm')}EPC ${epcBand} · ${epcScore}</span>
+            <span class="chip">${seal(ctBand==='D'?'warn':'ok','sm')}Council tax ${ctBand}</span>
+            <span class="chip">${seal('ok','sm')}Coalfield ${coalStatus}</span>
+            <span class="chip">${seal('ok','sm')}${tenure}</span>
           </div>`;
         },
-        pend:’auto-sources listing information once the UPRN validates’},
-      {id:’ready’,kind:’merge’,ln:’All details ready’,api:’internal’,prereqs:[‘pack’,’@seller_id’],
-        fired:()=>`<span class="chip">${seal(‘ok’,’sm’)}All listing information assembled — property is sale-ready</span>`,
-        pend:’needs listing info gathered and the seller’s ID verified’},
+        pend:'auto-sources listing information once the UPRN validates'},
+      {id:'ready',kind:'merge',ln:'All details ready',api:'internal',prereqs:['pack','@seller_id'],
+        fired:()=>`<span class="chip">${seal('ok','sm')}All listing information assembled — property is sale-ready</span>`,
+        pend:'needs listing info gathered and the seller's ID verified'},
       {id:'publish',kind:'input',ln:'Publish listing',api:'— export / portal',prereqs:['ready'],
         done:()=>!!state.published, lock:'unlocks once all details are ready', body:publishBody}
     ],
@@ -404,8 +404,8 @@ const ROLES = [
       {id:'request',kind:'input',ln:'Request pack',api:'GET /consent/request',prereqs:['bid'],
         done:()=>reqDone(), lock:'verify your identity first', body:()=>grid({type:'consentRequest',gate:'seller_consent'})},
       {id:'released',kind:'merge',ln:'Pack released',api:'consume pack',prereqs:['request','@seller_consent'],
-        fired:()=>`<span class="chip">${seal('ok','sm')}Pack released — inherits the seller’s seals, untouched</span>`,
-        pend:'waiting on the seller’s consent'},
+        fired:()=>`<span class="chip">${seal('ok','sm')}Pack released — inherits the seller's seals, untouched</span>`,
+        pend:'waiting on the seller's consent'},
       {id:'review',kind:'auto',ln:'Read the Passport',api:'GET full passport',prereqs:['released'],
         fired:reviewBody, pend:'available once the pack is released'}
     ],
@@ -414,15 +414,15 @@ const ROLES = [
   },
 
   { id:'sconv', n:'Role 3', name:'Seller Conveyancer', icon:'scale', avatar:'scale',
-    desc:'Acts for the seller. Inherits the seller’s advanced ID, retrieves surveys on demand, sets the completion date — then waits on the buyer side to action it before completion confirms.',
+    desc:'Acts for the seller. Inherits the seller's advanced ID, retrieves surveys on demand, sets the completion date — then waits on the buyer side to action it before completion confirms.',
     stats:[{v:'4',l:'graph steps'},{v:'inherited',l:'pack & ID',ok:true},{v:'1',l:'shared stream',ok:true}],
     nodes:[
       {id:'start',kind:'origin',ln:'Instructed'},
       {id:'advid',kind:'merge',ln:'Advanced ID',sub:'verification',api:'POST /identity/verify · enhanced',prereqs:['@seller_advid'],
-        fired:()=>`<span class="chip">${seal('ok','sm')}Seller’s advanced ID verified — inherited, signed</span>`,
+        fired:()=>`<span class="chip">${seal('ok','sm')}Seller's advanced ID verified — inherited, signed</span>`,
         pend:'the seller completes an advanced ID check (in the Seller tab)'},
       {id:'surveys',kind:'input',ln:'Retrieve surveys',api:'GET /documents?type=survey',prereqs:['advid'],
-        done:()=>!!(state.surv&&state.surv.sconv), lock:'the seller’s advanced ID must land first',
+        done:()=>!!(state.surv&&state.surv.sconv), lock:'the seller's advanced ID must land first',
         body:()=>grid({type:'surveys',role:'sconv',title:'Surveys — documents service',span:7},{type:'note',span:5,text:'Surveys ride the same documents store as the pack. Acting for the seller, the conveyancer pulls them on demand — each carries its own seal.'})},
       {id:'set',kind:'input',ln:'Set completion',sub:'date',api:'POST /conveyancing-events/completion-set',prereqs:['surveys'],
         done:()=>eventFired('completion_set'), lock:'retrieve the surveys first', body:setBody},
@@ -439,15 +439,15 @@ const ROLES = [
   },
 
   { id:'bconv', n:'Role 4', name:'Buyer Conveyancer', icon:'scale', avatar:'scale',
-    desc:'The compliance lens. Inherits the buyer’s ID, traces source-of-funds, runs AML — then actions completion once the seller side sets the date, and the TID auto-registers.',
+    desc:'The compliance lens. Inherits the buyer's ID, traces source-of-funds, runs AML — then actions completion once the seller side sets the date, and the TID auto-registers.',
     stats:[{v:'5',l:'graph steps'},{v:'inherited',l:'buyer ID',ok:true},{v:'AML',l:'screened',ok:true}],
     nodes:[
       {id:'start',kind:'origin',ln:'Instructed'},
       {id:'bid',kind:'merge',ln:'Verify identity',api:'POST /identity/verify',prereqs:['@buyer_id'],
-        fired:()=>`<span class="chip">${seal('ok','sm')}Buyer’s identity verified — inherited, signed</span>`,
+        fired:()=>`<span class="chip">${seal('ok','sm')}Buyer's identity verified — inherited, signed</span>`,
         pend:'the buyer verifies their identity (in the Buyer tab)'},
       {id:'funds',kind:'input',ln:'Source of funds',api:'GET /v1/source-of-funds',prereqs:['bid'],
-        done:()=>!!state.sof, lock:'the buyer’s ID must land first', body:fundsBody},
+        done:()=>!!state.sof, lock:'the buyer's ID must land first', body:fundsBody},
       {id:'aml',kind:'auto',ln:'AML screening',api:'GET screening',prereqs:['funds'],
         fired:()=>`<span class="chip">${seal('ok','sm')}AML clear — sanctions / PEP no match</span>`,
         pend:'runs automatically after funds are traced'},

@@ -225,7 +225,7 @@ function renderTracker(role){
     }
   });
   const hints = (r.branches&&r.branches.length)
-    ? `<div class="hhint up" style="top:${T.DIV-22}px;">↑ another party</div><div class="hhint dn" style="top:${T.DIV+7}px;">↓ ${SHORT[role]}’s own steps</div>`
+    ? `<div class="hhint up" style="top:${T.DIV-22}px;">↑ another party</div><div class="hhint dn" style="top:${T.DIV+7}px;">↓ ${SHORT[role]}'s own steps</div>`
     : '';
   el.innerHTML = svgEl + nodes + deps + hints;
 }
@@ -290,7 +290,7 @@ function renderFlow(){
   let chip='';
   if(cue&&cue.kind==='move') chip=`<span class="waitchip act">${svg('bolt',2)} Your move · ${cue.text}</span>`;
   else if(cue&&cue.kind==='wait') chip=`<span class="waitchip">${svg('clock',2)} Waiting on ${cue.party} · ${cue.text}</span>`;
-  else if(cue&&cue.kind==='done') chip=`<span class="waitchip ok">${sealSvg} This role’s steps are all complete</span>`;
+  else if(cue&&cue.kind==='done') chip=`<span class="waitchip ok">${sealSvg} This role's steps are all complete</span>`;
   document.getElementById('persona').innerHTML = `
     <div class="avatar">${svg(r.avatar,1.7)}</div>
     <div class="ptxt">
@@ -323,54 +323,54 @@ function chainStatus(){
   return ['Preparing',''];
 }
 const VMC_MILESTONE_STATUS = {
-  ‘Completion’:          [‘Completed’,’ok’],
-  ‘Completion Date Set’: [‘Completion set’,’’],
-  ‘Exchange’:            [‘Exchanged’,’’],
-  ‘Mortgage Offered’:    [‘Mortgage offered’,’’],
-  ‘Mortgage Applied’:    [‘Mortgage applied’,’’],
-  ‘Searches Ordered’:    [‘Searches ordered’,’’],
-  ‘Cash Buyer’:          [‘Cash buyer’,’’],
-  ‘SSTC’:                [‘SSTC’,’’],
-  ‘Fall Through’:        [‘Fallen through’,’warn’],
+  'Completion':          ['Completed','ok'],
+  'Completion Date Set': ['Completion set',''],
+  'Exchange':            ['Exchanged',''],
+  'Mortgage Offered':    ['Mortgage offered',''],
+  'Mortgage Applied':    ['Mortgage applied',''],
+  'Searches Ordered':    ['Searches ordered',''],
+  'Cash Buyer':          ['Cash buyer',''],
+  'SSTC':                ['SSTC',''],
+  'Fall Through':        ['Fallen through','warn'],
 };
 function vmcStatus(){
-  const chain = typeof realData!==’undefined’&&realData.chain?.data?.data?.[0];
+  const chain = typeof realData!=='undefined'&&realData.chain?.data?.data?.[0];
   if(!chain) return null;
   const milestones=chain.milestones||[];
   if(!milestones.length) return null;
   const latest=[...milestones].sort((a,b)=>b.date>a.date?1:-1)[0];
-  return VMC_MILESTONE_STATUS[latest.label]??[latest.label,’’];
+  return VMC_MILESTONE_STATUS[latest.label]??[latest.label,''];
 }
 function chainLinks(){
   const [st,ok]=chainStatus();
   const vmcSt=vmcStatus();
-  const chain=typeof realData!==’undefined’&&realData.chain?.data?.data?.[0];
+  const chain=typeof realData!=='undefined'&&realData.chain?.data?.data?.[0];
   if(chain&&chain.properties&&chain.properties.length){
     return chain.properties.map(p=>{
       const isOurs=p.uprn===resolvedUprn();
-      return {name:p.address||p.displayAddress||’Property’,sub:isOurs?’this sale’:’’,
-              stat:isOurs?(vmcSt?vmcSt[0]:st):’’,tone:isOurs?(vmcSt?vmcSt[1]:ok):’’,ours:isOurs};
+      return {name:p.address||p.displayAddress||'Property',sub:isOurs?'this sale':'',
+              stat:isOurs?(vmcSt?vmcSt[0]:st):'',tone:isOurs?(vmcSt?vmcSt[1]:ok):'',ours:isOurs};
     });
   }
   return [
-    {name:’First-time buyer’,sub:’no chain below’,stat:’ready’,tone:’ok’},
-    {name:’14 Elm Grove’,sub:’this sale’,stat:vmcSt?vmcSt[0]:st,tone:vmcSt?vmcSt[1]:ok,ours:true},
-    {name:’Onward purchase’,sub:’seller buying on’,stat:’offer accepted’,tone:’’},
-    {name:’Top of chain’,sub:’vacant possession’,stat:’no onward’,tone:’ok’},
+    {name:'First-time buyer',sub:'no chain below',stat:'ready',tone:'ok'},
+    {name:'14 Elm Grove',sub:'this sale',stat:vmcSt?vmcSt[0]:st,tone:vmcSt?vmcSt[1]:ok,ours:true},
+    {name:'Onward purchase',sub:'seller buying on',stat:'offer accepted',tone:''},
+    {name:'Top of chain',sub:'vacant possession',stat:'no onward',tone:'ok'},
   ];
 }
 function clinkHtml(l,pos){
-  if(!l) return ‘’;
-  const statCls=l.ours?(l.tone||’’):(‘muted ‘+(l.tone||’’)).trim();
-  const stat=l.stat?`<span class="cstat ${statCls}">${l.stat}</span>`:’’;
-  return `<div class="clink ${l.ours?’ours’:’’}"><span class="cpos">${pos}</span><b>${l.name}</b><span class="csub">${l.sub}</span>${stat}</div>`;
+  if(!l) return '';
+  const statCls=l.ours?(l.tone||''):('muted '+(l.tone||'')).trim();
+  const stat=l.stat?`<span class="cstat ${statCls}">${l.stat}</span>`:'';
+  return `<div class="clink ${l.ours?'ours':''}"><span class="cpos">${pos}</span><b>${l.name}</b><span class="csub">${l.sub}</span>${stat}</div>`;
 }
 function chainMore(n){ return `<div class="cmore"><span class="cm1">⋯</span><span class="cm2">+${n} more</span></div>`; }
 function renderChain(){
-  const m=document.getElementById(‘chainMount’); if(!m) return;
-  const arrow=`<div class="carrow">${svg(‘handoff’,1.8)}</div>`;
+  const m=document.getElementById('chainMount'); if(!m) return;
+  const arrow=`<div class="carrow">${svg('handoff',1.8)}</div>`;
   const links=chainLinks();
-  const live=typeof realData!==’undefined’&&!!realData.chain;
+  const live=typeof realData!=='undefined'&&!!realData.chain;
   let inner;
   if(links.length>4){
     const oi=links.findIndex(l=>l.ours);
@@ -386,13 +386,13 @@ function renderChain(){
     inner=links.map((l,i)=>clinkHtml(l,i+1)).join(arrow);
   }
   const tag=live
-    ?`<span class="partnertag live">${svg(‘check’,2)} ViewMyChain · live</span>`
-    :`<span class="partnertag">${svg(‘info’,2)} ViewMyChain · integration partner</span>`;
+    ?`<span class="partnertag live">${svg('check',2)} ViewMyChain · live</span>`
+    :`<span class="partnertag">${svg('info',2)} ViewMyChain · integration partner</span>`;
   m.innerHTML=`
   <div class="card chaincard s12">
     <div class="chead"><span class="ct">Property chain — visible to every role</span>${tag}</div>
     <div class="chain">${inner}</div>
-    <div class="note" style="margin-top:14px;"><span class="ni">${svg(‘info’)}</span><div>No OPDA API — chain position &amp; status come from the <b>ViewMyChain integration partner</b>, populated alongside the agent’s material information. Every role sees the same chain; <b>our sale</b> is matched by UPRN and its status tracks the live transaction.</div></div>
+    <div class="note" style="margin-top:14px;"><span class="ni">${svg('info')}</span><div>No OPDA API — chain position &amp; status come from the <b>ViewMyChain integration partner</b>, populated alongside the agent's material information. Every role sees the same chain; <b>our sale</b> is matched by UPRN and its status tracks the live transaction.</div></div>
   </div>`;
 }
 function updateTopSearch(){
