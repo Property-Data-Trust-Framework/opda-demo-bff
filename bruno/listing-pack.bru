@@ -1,0 +1,33 @@
+meta {
+  name: Listing Pack (EPC + Council Tax + Coalfield + Title)
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/demo-api/pack/{{uprn}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response has epc", function() {
+    expect(res.body).to.have.property("epc");
+  });
+
+  test("response has councilTax", function() {
+    expect(res.body).to.have.property("councilTax");
+  });
+
+  test("response has coalfield", function() {
+    expect(res.body).to.have.property("coalfield");
+  });
+
+  test("response has titleRegister", function() {
+    expect(res.body).to.have.property("titleRegister");
+  });
+}

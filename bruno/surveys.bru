@@ -1,0 +1,22 @@
+meta {
+  name: Surveys
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/demo-api/surveys/{{uprn}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response has documents array", function() {
+    expect(res.body).to.have.property("documents");
+    expect(res.body.documents).to.be.an("array");
+  });
+}

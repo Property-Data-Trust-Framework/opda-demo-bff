@@ -1,0 +1,21 @@
+meta {
+  name: Property Chain (ViewMyChain)
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/demo-api/chain/{{uprn}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response has data", function() {
+    expect(res.body).to.have.property("data");
+  });
+}

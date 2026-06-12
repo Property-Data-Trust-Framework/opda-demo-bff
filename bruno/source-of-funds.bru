@@ -1,0 +1,21 @@
+meta {
+  name: Source of Funds (Armalytix)
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/demo-api/source-of-funds
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response has status", function() {
+    expect(res.body).to.have.property("status");
+  });
+}

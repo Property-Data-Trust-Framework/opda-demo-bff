@@ -1,0 +1,21 @@
+meta {
+  name: Sprift Property
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/demo-api/sprift/property/{{uprn}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response has data", function() {
+    expect(res.body).to.have.property("data");
+  });
+}

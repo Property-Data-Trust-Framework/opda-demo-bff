@@ -152,7 +152,7 @@ const Blocks = {
         <div style="margin-top:13px;"><button class="linkbtn" data-searchreset>${svg('refresh',2)} new search</button></div></div>`);
     }
     return card(b,`<div class="searchwrap"><div class="searchin"><span class="ico">${svg('search',2)}</span><input id="addrInput" placeholder="Search an address or postcode…  e.g. 14 Elm Grove, Bristol BS6"></div><button class="btn" data-search>${svg('search',2)} Search</button></div>
-      <div class="sugg-row">try:<button class="sugg" data-search>14 Elm Grove, Bristol BS6 5DB</button></div>`);
+      <div class="sugg-row">try:<button class="sugg" data-search>14 Elm Grove, Bristol BS6 5DB</button><button class="sugg" data-search>10 Downing Street, London SW1A 2AA</button><button class="sugg" data-search>1 Canada Square, London E14 5AB</button></div>`);
   },
   surveys(b){
     const role=b.role, done=state.surv[role];

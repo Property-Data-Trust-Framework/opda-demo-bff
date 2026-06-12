@@ -1,0 +1,28 @@
+meta {
+  name: Sprift Comparables
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/demo-api/sprift/comparables/{{uprn}}
+  body: none
+  auth: none
+}
+
+params:query {
+  status: available
+  bedroom: 3
+  searchDistance: 0.5
+  limit: 10
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response has data", function() {
+    expect(res.body).to.have.property("data");
+  });
+}

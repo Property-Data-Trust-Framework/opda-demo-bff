@@ -1,0 +1,22 @@
+meta {
+  name: UPRN Validate
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/demo-api/uprn/{{uprn}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("valid is true", function() {
+    expect(res.body).to.have.property("valid");
+    expect(res.body.valid).to.equal(true);
+  });
+}

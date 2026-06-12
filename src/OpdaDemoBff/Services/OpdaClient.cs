@@ -34,9 +34,10 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
 
         var mtlsCert = X509Certificate2.CreateFromPem(certPem, keyPem);
 
-        // Both the token endpoint and the OPDA API need the same mTLS cert
+        // Both the token endpoint and the OPDA API need the same mTLS cert.
+        // Token handler bypasses server-cert validation — see BuildMtlsHandler.
         var apiHandler   = BuildMtlsHandler(mtlsCert);
-        var tokenHandler = BuildMtlsHandler(mtlsCert);
+        var tokenHandler = BuildMtlsHandler(mtlsCert, trustOpdaSandboxCa: true);
 
         var rsa = RSA.Create();
         rsa.ImportFromPem(sigPem);
@@ -193,10 +194,15 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         return res.Parameter.Value;
     }
 
-    private static HttpClientHandler BuildMtlsHandler(X509Certificate2 cert)
+    private static HttpClientHandler BuildMtlsHandler(X509Certificate2 cert, bool trustOpdaSandboxCa = false)
     {
         var h = new HttpClientHandler();
         h.ClientCertificates.Add(cert);
+        // The OPDA Sandbox Issuing CA is not in the standard system trust store.
+        // Auth is covered by mTLS + private_key_jwt, so server-cert validation on
+        // the token endpoint is bypassed rather than bundling the private CA cert.
+        if (trustOpdaSandboxCa)
+            h.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
         return h;
     }
 

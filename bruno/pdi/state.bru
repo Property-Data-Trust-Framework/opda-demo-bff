@@ -1,0 +1,22 @@
+meta {
+  name: PDI Current State
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/demo-api/pdi/state/{{pdtfUprn}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response has data and jwsSignature", function() {
+    expect(res.body).to.have.property("data");
+    expect(res.body).to.have.property("jwsSignature");
+  });
+}
