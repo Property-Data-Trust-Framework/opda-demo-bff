@@ -90,10 +90,15 @@ variable "pdi_base_url" {
 
 variable "sprift_base_url" {
   type    = string
-  default = ""
+  default = "https://opdatest.sprift.com"
 }
 
 variable "sprift_scope" {
   type    = string
-  default = ""
+  default = "property-pack"
+}
+
+variable "sprift_api_key" {
+  type      = string
+  sensitive = true
 }

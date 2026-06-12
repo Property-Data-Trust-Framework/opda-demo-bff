@@ -27,6 +27,10 @@
         <span class="uprn" id="topUprn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12l5 5L20 7"/></svg>UPRN 10009 12345</span>
       </div>
       <div class="topright">
+        <button class="btn ghost" style="padding:6px 13px;font-size:12px;" data-resetall>
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 10-2.6 6.1"/><path d="M20.5 5.5V11h-5.5"/></svg>
+  Reset demo
+</button>
         <span class="envpill"><span class="dot"></span>dev.api.smartpropdata.org.uk</span>
         <span class="provsum"><span class="seal sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12l5 5L20 7"/></svg></span><span class="lbl">provenance<br/><b>6 / 7 verified</b></span></span>
       </div>
@@ -43,6 +47,7 @@
       <div class="viewseg" id="viewseg">
         <button class="on" data-view="flows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><path d="M7 6h8a3 3 0 010 6H9a3 3 0 000 6h8"/></svg>Role flows</button>
         <button data-view="passport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Passport</button>
+        <button data-view="payloads"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4c-1.7 0-2 1.3-2 3v1.4C7 9.7 6.3 10.4 5 10.4c1.3 0 2 .7 2 2V14c0 1.7.3 3 2 3"/><path d="M15 4c1.7 0 2 1.3 2 3v1.4c0 1.3.7 2 2 2-1.3 0-2 .7-2 2V14c0 1.7-.3 3-2 3"/></svg>Payloads</button>
       </div>
     </nav>
 
@@ -58,6 +63,7 @@
             <div id="chainMount"></div>
           </section>
           <section class="view" id="passportView"></section>
+          <section class="view" id="payloadsView"></section>
         </div>
       </main>
     </div>

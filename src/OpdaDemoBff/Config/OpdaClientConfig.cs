@@ -9,4 +9,7 @@ public class OpdaClientConfig
     public string ClientId        { get; init; } = "";
     public string TokenEndpoint   { get; init; } = "";
     public string Scope           { get; init; } = "land-registry";
+    // Optional extra header loaded from SSM — used by Sprift sandbox (x-api-key).
+    public string? ApiKeyPath       { get; init; }
+    public string  ApiKeyHeaderName { get; init; } = "x-api-key";
 }

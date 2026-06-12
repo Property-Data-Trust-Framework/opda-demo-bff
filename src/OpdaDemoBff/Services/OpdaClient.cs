@@ -41,8 +41,15 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         var rsa = RSA.Create();
         rsa.ImportFromPem(sigPem);
 
+        var apiClient = new HttpClient(apiHandler) { BaseAddress = new Uri(cfg.ApiBaseUrl) };
+        if (!string.IsNullOrEmpty(cfg.ApiKeyPath))
+        {
+            var apiKey = await GetParam(ssm, cfg.ApiKeyPath, withDecryption: true);
+            apiClient.DefaultRequestHeaders.Add(cfg.ApiKeyHeaderName, apiKey);
+        }
+
         return new OpdaClient(
-            apiClient:     new HttpClient(apiHandler)   { BaseAddress = new Uri(cfg.ApiBaseUrl) },
+            apiClient:     apiClient,
             tokenClient:   new HttpClient(tokenHandler),
             signingKey:    rsa,
             clientId:      cfg.ClientId,
@@ -82,6 +89,31 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         return res.IsSuccessStatusCode
             ? await res.Content.ReadFromJsonAsync<JsonElement>(ct)
             : null;
+    }
+
+    public async Task<(JsonElement? Body, string? JwsSignature)> GetWithJwsAsync(string path, CancellationToken ct = default)
+    {
+        var token = await GetTokenAsync(ct);
+        using var req = new HttpRequestMessage(HttpMethod.Get, path);
+        req.Headers.Authorization = new("Bearer", token);
+        var res = await _apiClient.SendAsync(req, ct);
+        if (!res.IsSuccessStatusCode) return (null, null);
+        var body = await res.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var jws  = res.Headers.TryGetValues("x-jws-signature", out var vals) ? vals.FirstOrDefault() : null;
+        return (body, jws);
+    }
+
+    public async Task<(JsonElement? Body, string? JwsSignature)> PostWithJwsAsync(string path, object body, CancellationToken ct = default)
+    {
+        var token = await GetTokenAsync(ct);
+        using var req = new HttpRequestMessage(HttpMethod.Post, path);
+        req.Headers.Authorization = new("Bearer", token);
+        req.Content = JsonContent.Create(body);
+        var res = await _apiClient.SendAsync(req, ct);
+        if (!res.IsSuccessStatusCode) return (null, null);
+        var json = await res.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var jws  = res.Headers.TryGetValues("x-jws-signature", out var vals) ? vals.FirstOrDefault() : null;
+        return (json, jws);
     }
 
     public async Task<JsonElement?> PostFormAsync(string path, IEnumerable<KeyValuePair<string, string>> fields, CancellationToken ct = default)

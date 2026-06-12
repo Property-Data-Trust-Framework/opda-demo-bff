@@ -29,3 +29,11 @@ resource "aws_ssm_parameter" "opda_signing_key" {
   overwrite = true
   tags      = local.tags
 }
+
+resource "aws_ssm_parameter" "sprift_api_key" {
+  name      = "/${local.name_prefix}/sprift_api_key"
+  type      = "SecureString"
+  value     = var.sprift_api_key
+  overwrite = true
+  tags      = local.tags
+}

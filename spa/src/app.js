@@ -117,7 +117,7 @@ function cascade(){
             bffFetch('/demo-api/pack/100091225620').then(r=>{ if(r){ realData.pack=r; renderFlow(); } });
           }
           if(f.role==='seller'&&f.id==='packSourced'){
-            bffFetch('/demo-api/pdi/pack/100091225620').then(r=>{ if(r){ realData.sellerPack=r; renderFlow(); } });
+            bffFetch('/demo-api/property-pack/100091225620').then(r=>{ if(r){ realData.sellerPack=r; renderFlow(); } });
           }
           persist(); render(); cascade();
         }, 760);
@@ -318,77 +318,77 @@ function chainStatus(){
   if(state.addr) return ['Onboarding',''];
   return ['Preparing',''];
 }
-// Map VMC milestone labels to a display status for the "our sale" chain link.
 const VMC_MILESTONE_STATUS = {
-  ‘Completion’:          [‘Completed’,         ‘ok’],
-  ‘Completion Date Set’: [‘Completion set’,    ‘’],
-  ‘Exchange’:            [‘Exchanged’,         ‘’],
-  ‘Mortgage Offered’:    [‘Mortgage offered’,  ‘’],
-  ‘Mortgage Applied’:    [‘Mortgage applied’,  ‘’],
-  ‘Searches Ordered’:    [‘Searches ordered’,  ‘’],
-  ‘Cash Buyer’:          [‘Cash buyer’,        ‘’],
-  ‘SSTC’:                [‘SSTC’,              ‘’],
-  ‘Fall Through’:        [‘Fallen through’,    ‘warn’],
+  ‘Completion’:          [‘Completed’,’ok’],
+  ‘Completion Date Set’: [‘Completion set’,’’],
+  ‘Exchange’:            [‘Exchanged’,’’],
+  ‘Mortgage Offered’:    [‘Mortgage offered’,’’],
+  ‘Mortgage Applied’:    [‘Mortgage applied’,’’],
+  ‘Searches Ordered’:    [‘Searches ordered’,’’],
+  ‘Cash Buyer’:          [‘Cash buyer’,’’],
+  ‘SSTC’:                [‘SSTC’,’’],
+  ‘Fall Through’:        [‘Fallen through’,’warn’],
 };
 function vmcStatus(){
-  const chain = realData.chain?.data?.data?.[0];
+  const chain = typeof realData!==’undefined’&&realData.chain?.data?.data?.[0];
   if(!chain) return null;
-  const milestones = chain.milestones || [];
+  const milestones=chain.milestones||[];
   if(!milestones.length) return null;
-  const latest = [...milestones].sort((a,b)=> b.date > a.date ? 1 : -1)[0];
-  return VMC_MILESTONE_STATUS[latest.label] ?? [latest.label, ‘’];
+  const latest=[...milestones].sort((a,b)=>b.date>a.date?1:-1)[0];
+  return VMC_MILESTONE_STATUS[latest.label]??[latest.label,’’];
 }
+function chainLinks(){
+  const [st,ok]=chainStatus();
+  const vmcSt=vmcStatus();
+  const chain=typeof realData!==’undefined’&&realData.chain?.data?.data?.[0];
+  if(chain&&chain.properties&&chain.properties.length){
+    return chain.properties.map(p=>{
+      const isOurs=p.uprn===’100091225620’;
+      return {name:p.address||p.displayAddress||’Property’,sub:isOurs?’this sale’:’’,
+              stat:isOurs?(vmcSt?vmcSt[0]:st):’’,tone:isOurs?(vmcSt?vmcSt[1]:ok):’’,ours:isOurs};
+    });
+  }
+  return [
+    {name:’First-time buyer’,sub:’no chain below’,stat:’ready’,tone:’ok’},
+    {name:’14 Elm Grove’,sub:’this sale’,stat:vmcSt?vmcSt[0]:st,tone:vmcSt?vmcSt[1]:ok,ours:true},
+    {name:’Onward purchase’,sub:’seller buying on’,stat:’offer accepted’,tone:’’},
+    {name:’Top of chain’,sub:’vacant possession’,stat:’no onward’,tone:’ok’},
+  ];
+}
+function clinkHtml(l,pos){
+  if(!l) return ‘’;
+  const statCls=l.ours?(l.tone||’’):(‘muted ‘+(l.tone||’’)).trim();
+  const stat=l.stat?`<span class="cstat ${statCls}">${l.stat}</span>`:’’;
+  return `<div class="clink ${l.ours?’ours’:’’}"><span class="cpos">${pos}</span><b>${l.name}</b><span class="csub">${l.sub}</span>${stat}</div>`;
+}
+function chainMore(n){ return `<div class="cmore"><span class="cm1">⋯</span><span class="cm2">+${n} more</span></div>`; }
 function renderChain(){
   const m=document.getElementById(‘chainMount’); if(!m) return;
-  const demoSt = chainStatus();
-  const vmcSt  = vmcStatus();
-  // Prefer VMC milestone as the "our sale" status; fall back to demo state.
-  const [st,ok] = vmcSt ?? demoSt;
-  const chain   = realData.chain?.data?.data?.[0];
-  const arrow   = `<div class="carrow">${svg(‘handoff’,1.8)}</div>`;
-  const isLive  = !!chain;
-  const chainTypeTag = chain
-    ? `<span class="partnertag">${svg(‘check’,2)} ViewMyChain · live</span>`
-    : `<span class="partnertag">${svg(‘info’,2)} ViewMyChain · integration partner</span>`;
-
-  // Build chain links — use real properties if available, otherwise mock 4-link layout.
-  let links=’’;
-  if(chain && chain.properties && chain.properties.length){
-    const props = chain.properties;
-    const isBottom = chain.isBottomClosed;
-    const isTop    = chain.isTopClosed;
-    props.forEach((p,i)=>{
-      const isOurs = p.uprn === ‘100091225620’;
-      const addr   = p.address || p.displayAddress || `Property ${i+1}`;
-      const sub    = isOurs ? ‘this sale’
-                   : i===0 && isBottom ? ‘no chain below’
-                   : i===props.length-1 && isTop ? ‘vacant possession’
-                   : ‘in chain’;
-      const statTxt= isOurs ? st : ‘’;
-      const statCls= isOurs ? ok : ‘’;
-      const cls    = isOurs ? ‘ours’ : ‘’;
-      links += `<div class="clink ${cls}"><span class="cpos">${i+1}</span><b>${addr}</b><span class="csub">${sub}</span>${statTxt?`<span class="cstat ${statCls}">${statTxt}</span>`:’’}</div>`;
-      if(i<props.length-1) links+=arrow;
-    });
+  const arrow=`<div class="carrow">${svg(‘handoff’,1.8)}</div>`;
+  const links=chainLinks();
+  const live=typeof realData!==’undefined’&&!!realData.chain;
+  let inner;
+  if(links.length>4){
+    const oi=links.findIndex(l=>l.ours);
+    const leftHidden=oi-1,rightHidden=links.length-(oi+2);
+    const parts=[];
+    if(leftHidden>0) parts.push(chainMore(leftHidden));
+    if(links[oi-1]) parts.push(clinkHtml(links[oi-1],oi));
+    parts.push(clinkHtml(links[oi],oi+1));
+    if(links[oi+1]) parts.push(clinkHtml(links[oi+1],oi+2));
+    if(rightHidden>0) parts.push(chainMore(rightHidden));
+    inner=parts.join(arrow);
   } else {
-    // Mock fallback
-    links = `
-      <div class="clink"><span class="cpos">1</span><b>First-time buyer</b><span class="csub">no chain below</span><span class="cstat ok">ready</span></div>
-      ${arrow}
-      <div class="clink ours"><span class="cpos">2</span><b>14 Elm Grove</b><span class="csub">this sale</span><span class="cstat ${ok}">${st}</span></div>
-      ${arrow}
-      <div class="clink"><span class="cpos">3</span><b>Onward purchase</b><span class="csub">seller buying on</span><span class="cstat">offer accepted</span></div>
-      ${arrow}
-      <div class="clink"><span class="cpos">4</span><b>Top of chain</b><span class="csub">vacant possession</span><span class="cstat ok">no onward</span></div>`;
+    inner=links.map((l,i)=>clinkHtml(l,i+1)).join(arrow);
   }
-  const note = isLive
-    ? `<div class="note" style="margin-top:14px;"><span class="ni">${svg(‘check’)}</span><div>Chain data supplied live by <b>ViewMyChain</b> via the PDTF <code>transaction-status</code> API. Milestones update automatically via webhook. Every role sees the same chain.</div></div>`
-    : `<div class="note" style="margin-top:14px;"><span class="ni">${svg(‘info’)}</span><div>Chain data will be supplied by <b>ViewMyChain</b> once the address is resolved. Every role sees the same chain; <b>our sale</b>’s status tracks the live transaction.</div></div>`;
-  m.innerHTML = `
+  const tag=live
+    ?`<span class="partnertag live">${svg(‘check’,2)} ViewMyChain · live</span>`
+    :`<span class="partnertag">${svg(‘info’,2)} ViewMyChain · integration partner</span>`;
+  m.innerHTML=`
   <div class="card chaincard s12">
-    <div class="chead"><span class="ct">Property chain — visible to every role</span>${chainTypeTag}</div>
-    <div class="chain">${links}</div>
-    ${note}
+    <div class="chead"><span class="ct">Property chain — visible to every role</span>${tag}</div>
+    <div class="chain">${inner}</div>
+    <div class="note" style="margin-top:14px;"><span class="ni">${svg(‘info’)}</span><div>No OPDA API — chain position &amp; status come from the <b>ViewMyChain integration partner</b>, populated alongside the agent’s material information. Every role sees the same chain; <b>our sale</b> is matched by UPRN and its status tracks the live transaction.</div></div>
   </div>`;
 }
 function updateTopSearch(){
@@ -442,19 +442,27 @@ function buildStream(){
 /* ============================================================
    PASSPORT VIEW (shared layer)
    ============================================================ */
+/* wrap a passport card with a "{ } JSON" inspect chip that deep-links to its payload */
+function pgrid(specs){
+  return specs.map(s=>{
+    const inner=renderBlocks([s]);
+    if(!s.payloadId) return inner;
+    return `<div class="plwrap" style="grid-column:span ${s.span||6};">${inner}<button class="plchip" data-inspect="${s.payloadId}" title="View the signed JSON behind this fact">${svg('braces',2)} JSON</button></div>`;
+  }).join('');
+}
 function renderPassport(){
   const cards = [
-    {type:'kpis',title:'Council tax',span:3,items:[{label:'Band',value:'D',seal:'warn'}]},
-    {type:'epc',title:'Energy — EPC',span:3,band:'C',value:'C · 72',potential:'B',seal:'ok',provLabel:'signed'},
-    {type:'kpis',title:'Mining / coalfield',span:3,items:[{label:'Status',value:'OFF',seal:'ok',sub:'low risk'}]},
-    {type:'kpis',title:'Source of funds',span:3,items:[{label:'Status',value:'Verified',small:true,seal:'ok',sub:'deposit traced'}]}
+    {type:'kpis',title:'Council tax',span:3,payloadId:'council_tax',items:[{label:'Band',value:'D',seal:'warn'}]},
+    {type:'epc',title:'Energy — EPC',span:3,payloadId:'epc',band:'C',value:'C · 72',potential:'B',seal:'ok',provLabel:'signed'},
+    {type:'kpis',title:'Mining / coalfield',span:3,payloadId:'coalfield',items:[{label:'Status',value:'OFF',seal:'ok',sub:'low risk'}]},
+    {type:'kpis',title:'Source of funds',span:3,payloadId:'source_of_funds',items:[{label:'Status',value:'Verified',small:true,seal:'ok',sub:'deposit traced'}]}
   ];
   const wide = [
-    {type:'kpis',title:'Title register &amp; ownership',span:8,cols:3,seal:'ok',provLabel:'signed HMLR',
+    {type:'kpis',title:'Title register &amp; ownership',span:8,cols:3,seal:'ok',provLabel:'signed HMLR',payloadId:'title_register',
       items:[{label:'Tenure',value:'Freehold',small:true},{label:'Title number',value:'ABC12345',small:true},{label:'Price paid',value:'£xxx,xxx',small:true}]},
-    {type:'map',title:'Location',span:4}
+    {type:'map',title:'Location',span:4,payloadId:'address'}
   ];
-  const docs = [{type:'docs',title:'Survey documents',span:6,seal:'ok',provLabel:'signed S3',
+  const docs = [{type:'docs',title:'Survey documents',span:6,seal:'ok',provLabel:'signed S3',payloadId:'surveys',
     items:[{name:'RICS Level 2 survey.pdf',meta:'2.4 MB · pre-signed S3',seal:'ok'},{name:'Floor plan.pdf',meta:'480 KB · pre-signed S3',seal:'ok'}]},
     {type:'status',tone:'ok',title:'Identity &amp; AML',span:6,seal:'ok',provLabel:'signed',
       lines:['Buyer identity verified','Source of funds traced','AML screening clear']}];
@@ -465,21 +473,145 @@ function renderPassport(){
       <div class="ptxt">
         <span class="rolenum">Shared layer</span>
         <h1>Property Passport</h1>
-        <p>The single property truth every role reads from. Each source wears a provenance seal driven by its signature block.</p>
+        <p>The single property truth every role reads from. Each source wears a provenance seal driven by its signature block — open <b>{ } JSON</b> on any card to inspect the signed payload behind it.</p>
       </div>
       <div class="pstats"><div class="s"><div class="v ok">6 / 7</div><div class="l">sources signed</div></div><div class="s"><div class="v">8</div><div class="l">APIs</div></div></div>
     </div>
     <div class="sectlabel">Property facts</div>
-    <div class="grid" style="margin-bottom:18px;">${renderBlocks(cards)}</div>
-    <div class="grid" style="margin-bottom:18px;">${renderBlocks(wide)}</div>
-    <div class="grid">${renderBlocks(docs)}</div>`;
+    <div class="grid" style="margin-bottom:18px;">${pgrid(cards)}</div>
+    <div class="grid" style="margin-bottom:18px;">${pgrid(wide)}</div>
+    <div class="grid">${pgrid(docs)}</div>`;
+}
+
+/* ============================================================
+   SIGNED PAYLOADS VIEW (Inspector lens, shared layer)
+   ============================================================ */
+function payloadRetrieved(gate){
+  switch(gate){
+    case 'addr':       return !!state.addr;
+    case 'pack':       return flagDone('agent.pack');
+    case 'sof':        return !!state.sof;
+    case 'surv':       return !!(state.surv && (state.surv.sconv||state.surv.bconv));
+    case 'sellerPack': return flagDone('seller.packSourced');
+    case 'chain':      return !!(typeof realData!=='undefined'&&realData.chain);
+    default:           return !!state.addr;
+  }
+}
+function gateHint(gate){
+  if(gate==='sof')        return 'bconv';
+  if(gate==='surv')       return 'sconv';
+  if(gate==='sellerPack') return 'seller';
+  if(gate==='chain')      return 'agent';
+  return 'agent';
+}
+// Return real sig data from BFF realData when available, else fall back to static model.
+function resolvedSig(s){
+  if(s.id==='chain'){
+    const p=realData.chain?.provenance;
+    if(p) return { alg:p.alg, kid:p.kid, iss:'ViewMyChain', signedAt:p.signedAt, value:p.signature };
+  }
+  if(s.id==='property_pack'){
+    const jws=realData.sellerPack?.jwsSignature;
+    if(jws) return { alg:'ES256', kid:'(x-jws-signature)', iss:'Sprift / PDI', signedAt:'(see header)', value:jws };
+  }
+  // For our OPDA API sources, pull provenance from realData.pack when available.
+  const packMap={epc:'epc',council_tax:'councilTax',coalfield:'coalfield',title_register:'titleRegister'};
+  const key=packMap[s.id];
+  if(key){
+    const p=realData.pack?.[key]?.provenance;
+    if(p) return { alg:p.alg, kid:p.kid, iss:'(OPDA)', signedAt:p.signedAt, value:p.signature };
+  }
+  return s.sig;
+}
+function jsonHighlight(obj){
+  const json = JSON.stringify(obj, null, 2)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g, m=>{
+    let cls='jn';
+    if(/^"/.test(m)) cls = /:$/.test(m.trim()) ? 'jk' : 'js';
+    else if(/true|false/.test(m)) cls='jb';
+    else if(/null/.test(m)) cls='jnull';
+    return '<span class="'+cls+'">'+m+'</span>';
+  });
+}
+function payloadCard(s){
+  const got = payloadRetrieved(s.gate);
+  const sealEl = !got ? `<span class="plseal pend">${svg('clock',2)} not retrieved</span>`
+    : s.signed ? `<span class="plseal ok">${svg('check',2.4)} signed</span>`
+    : `<span class="plseal warn">unsigned</span>`;
+  let body;
+  if(!got){
+    const tab=gateHint(s.gate);
+    body=`<div class="plpend">Not yet retrieved — pulled in via the ${roleObj(tab).name} flow. <button class="jumplink" data-jump="${tab}">Go there →</button></div>`;
+  } else {
+    const sig = resolvedSig(s);
+    const isReal = sig !== s.sig;
+    const sigBlock = s.signed
+      ? `${isReal?'<div style="font-family:var(--mono);font-size:9px;color:var(--ok-2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">✓ live signature from BFF</div>':''}
+         <div class="plsigrow"><span>alg</span><b>${sig.alg}</b></div>
+         <div class="plsigrow"><span>kid</span><b>${sig.kid}</b></div>
+         <div class="plsigrow"><span>iss</span><b>${sig.iss}</b></div>
+         <div class="plsigrow"><span>signed</span><b>${sig.signedAt}</b></div>
+         <div class="plsigval mono">${sig.value||'(pending BFF response)'}</div>`
+      : `<div class="plnosig">${s.sig.note}</div>`;
+    body=`<pre class="pljson"><code>${jsonHighlight(s.claims)}</code></pre>
+      <button class="plsigtoggle ${s.signed?'':'warn'}" data-sigtoggle="${s.id}">${svg('shield',2)} ${s.signed?'JWS signature':'signature status'}<span class="plcaret">▸</span></button>
+      <div class="plsig" id="sig-${s.id}" hidden>${sigBlock}</div>`;
+  }
+  return `<div class="card plcard s6 ${got?'':'pl-pend'}" id="pl-${s.id}">
+    <div class="plhead"><div class="plt"><span class="plname">${s.name}</span><span class="plmeta mono">${s.service} · ${s.endpoint}</span></div>${sealEl}</div>
+    ${body}</div>`;
+}
+function renderPayloads(){
+  const host=document.getElementById('payloadsView');
+  if(!state.addr){
+    host.innerHTML=`<div class="plempty">${svg('braces',1.6)}<div><h2>No payloads yet</h2><p>Resolve a property in the Estate Agent flow — its signed source payloads appear here as each one is pulled back.</p><button class="btn amber" data-jump="agent">${svg('arrow')} Go to the Estate Agent</button></div></div>`;
+    return;
+  }
+  const got = PAYLOADS.sources.filter(s=>payloadRetrieved(s.gate));
+  const signedCount = got.filter(s=>s.signed).length;
+  const env = Object.assign({}, PAYLOADS.envelope, { sourcesRetrieved: got.length, sourcesSigned: signedCount });
+  host.innerHTML = `
+    <div class="persona" style="margin-bottom:22px;">
+      <div class="avatar">${svg('braces',1.7)}</div>
+      <div class="ptxt">
+        <span class="rolenum">Inspector lens</span>
+        <h1>Signed payloads</h1>
+        <p>The raw, signed source responses behind every Passport fact. Each is a self-contained JWS — verify the signature, read the claims. Open <b>{ } JSON</b> on a Passport card to land on its source.</p>
+      </div>
+      <div class="pstats">
+        <div class="s"><div class="v">${got.length} / ${PAYLOADS.sources.length}</div><div class="l">retrieved</div></div>
+        <div class="s"><div class="v ok">${signedCount}</div><div class="l">signed</div></div>
+        <div class="s"><div class="v">ES256</div><div class="l">algorithm</div></div>
+      </div>
+    </div>
+    <div class="sectlabel">Property-pack envelope</div>
+    <div class="grid" style="margin-bottom:18px;">
+      <div class="card plcard plenvelope s12" id="pl-envelope">
+        <div class="plhead"><div class="plt"><span class="plname">Property pack</span><span class="plmeta mono">${env.pack}</span></div><span class="plseal ok">${svg('check',2.4)} pack verified</span></div>
+        <pre class="pljson"><code>${jsonHighlight(env)}</code></pre>
+      </div>
+    </div>
+    <div class="sectlabel">Source payloads</div>
+    <div class="grid">${PAYLOADS.sources.map(payloadCard).join('')}</div>`;
+}
+function inspectPayload(id){
+  setView('payloads');
+  const sc=document.querySelector('main.main'), el=document.getElementById('pl-'+id);
+  if(el&&sc){
+    const r=el.getBoundingClientRect(), sr=sc.getBoundingClientRect();
+    sc.scrollTop += (r.top - sr.top) - 90;
+    el.classList.add('plflash'); setTimeout(()=>el.classList.remove('plflash'),1500);
+  }
 }
 function setView(v){
   state.view=v;
   document.querySelectorAll('#viewseg button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
   document.getElementById('flowsView').classList.toggle('active',v==='flows');
   document.getElementById('passportView').classList.toggle('active',v==='passport');
+  document.getElementById('payloadsView').classList.toggle('active',v==='payloads');
   if(v==='passport') renderPassport();
+  if(v==='payloads') renderPayloads();
   persist();
 }
 
@@ -489,6 +621,12 @@ function setView(v){
 function sync(){ render(); persist(); cascade(); }
 function setRole(id){ state.role=id; render(); persist(); }
 function mark(key){ state.lastKey=key; }
+function resetAll(){
+  const role=state.role||'agent', view=state.view||'flows';
+  state={ role, view, flags:{}, fired:{}, gates:{}, id:{}, surv:{},
+          addr:null, invited:null, published:null, advid:null, sof:null, lastKey:null };
+  firing=null; realData={}; render(); setView(view); persist(); cascade();
+}
 
 function searchAddress(){
   if(state.addr) return;
@@ -536,6 +674,10 @@ function persist(){ try{ const c=Object.assign({},state); localStorage.setItem('
 document.getElementById('roleBar').addEventListener('click',e=>{ const b=e.target.closest('.rtab'); if(b&&b.dataset.role) setRole(b.dataset.role); });
 document.getElementById('viewseg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b&&b.dataset.view) setView(b.dataset.view); });
 document.body.addEventListener('click',e=>{
+  if(e.target.closest('[data-resetall]')){ resetAll(); return; }
+  const insp=e.target.closest('[data-inspect]'); if(insp){ inspectPayload(insp.dataset.inspect); return; }
+  const sgt=e.target.closest('[data-sigtoggle]'); if(sgt){ const el=document.getElementById('sig-'+sgt.dataset.sigtoggle); if(el){ el.hidden=!el.hidden; sgt.classList.toggle('open',!el.hidden); } return; }
+  const jl=e.target.closest('.jumplink[data-jump]'); if(jl){ setRole(jl.dataset.jump); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const jump=e.target.closest('[data-jump]'); if(jump){ setRole(jump.dataset.jump); window.scrollTo({top:0,behavior:'smooth'}); return; }
   const node=e.target.closest('[data-node]'); if(node){ const p=document.getElementById('np-'+node.dataset.node); if(p) p.scrollIntoView({behavior:'smooth',block:'center'}); return; }
   if(e.target.closest('[data-search]')){ searchAddress(); return; }

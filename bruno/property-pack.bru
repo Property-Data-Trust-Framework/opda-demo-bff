@@ -1,0 +1,32 @@
+meta {
+  name: Property Pack (Sprift → PDI fallback)
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/demo-api/property-pack/{{uprn}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response has source field", function() {
+    expect(res.body).to.have.property("source");
+    expect(["sprift", "pdi"]).to.include(res.body.source);
+  });
+
+  test("response has data", function() {
+    expect(res.body).to.have.property("data");
+  });
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("Pack sourced from:", res.body.source);
+  }
+}

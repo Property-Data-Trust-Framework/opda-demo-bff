@@ -34,7 +34,8 @@ const I = {
   handoff:'<path d="M3 9h13l-3.5-3.5M21 15H8l3.5 3.5"/>',
   mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M4 7l8 6 8-6"/>',
   arrow:'<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
-  cal:'<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/>'
+  cal:'<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/>',
+  braces:'<path d="M9 4c-1.7 0-2 1.3-2 3v1.4C7 9.7 6.3 10.4 5 10.4c1.3 0 2 .7 2 2V14c0 1.7.3 3 2 3"/><path d="M15 4c1.7 0 2 1.3 2 3v1.4c0 1.3.7 2 2 2-1.3 0-2 .7-2 2V14c0 1.7-.3 3-2 3"/>',
 };
 const svg = (name, sw=1.85) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${I[name]||''}</svg>`;
 const sealSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>`;
@@ -375,15 +376,12 @@ const ROLES = [
         pend:'emitted automatically once you verify'},
       {id:'advid',kind:'input',ln:'Advanced ID',sub:'verification',api:'POST /identity/verify · enhanced',prereqs:['shared'],
         done:()=>!!state.advid, lock:'complete your initial verification first', body:advidBody},
-      {id:'packSourced',kind:'auto',ln:'Property pack sourced',sub:'Sprift / PDI',api:'POST /property-pack/uprn',prereqs:['advid'],
+      {id:'packSourced',kind:'auto',ln:'Property pack sourced',sub:'Sprift / PDI',api:'GET /demo-api/property-pack',prereqs:['advid'],
         fired:()=>{
-          const p=typeof realData!=='undefined'&&realData.sellerPack;
-          if(p&&p.propertyPack){
-            const epc=p.propertyPack.energyEfficiency?.epcRating??'C';
-            const ct=p.propertyPack.councilTax?.band??'D';
-            return `<div class="chips"><span class="chip">${seal('ok','sm')}Property pack sourced</span><span class="chip">${seal('ok','sm')}EPC ${epc}</span><span class="chip">${seal('ok','sm')}Council tax ${ct}</span></div>`;
-          }
-          return `<span class="chip">${seal('ok','sm')}Property pack sourced and sealed — ready to release to buyers</span>`;
+          const s=typeof realData!=='undefined'&&realData.sellerPack;
+          const sourceLabel=s?.source==='sprift'?'Sprift':s?.source==='pdi'?'PDI':null;
+          const label=sourceLabel?`Property pack sourced · ${sourceLabel}`:'Property pack sourced and sealed';
+          return `<span class="chip">${seal('ok','sm')}${label} — ready to release to buyers</span>`;
         },
         pend:'auto-sources the full property pack once advanced ID is verified'},
       {id:'consent',kind:'input',ln:'Grant consent',api:'POST /consent/release-pack',prereqs:['packSourced','@buyer_req'],openOnReach:true,
@@ -470,3 +468,91 @@ const ROLES = [
     ]
   }
 ];
+
+/* ============================================================
+   SIGNED PAYLOADS — the raw, signed source responses behind
+   each Passport fact (Inspector lens). Per-source JWS objects
+   nested under one property-pack envelope.
+   `gate` maps a source to the flow state that "pulls" it.
+   ============================================================ */
+const UPRN_ID = '100091234567';
+const PAYLOADS = {
+  uprn: UPRN_ID,
+  envelope: {
+    pack: 'property-pack/' + UPRN_ID,
+    uprn: UPRN_ID,
+    schema: 'pdtf/v0.6',
+    sourcesTotal: 7,
+    sourcesSigned: 6,
+    assembledBy: ['estate-agent', 'seller'],
+    assembledAt: '2026-06-11T09:18:40Z',
+    packSignature: { alg: 'ES256', kid: 'opda-pack-key-1', verified: true }
+  },
+  sources: [
+    { id:'address', name:'Address & UPRN', service:'OS Places', endpoint:'GET /v1/places/uprn/'+UPRN_ID,
+      signed:true, gate:'addr',
+      sig:{ alg:'ES256', kid:'os-places-key-2', iss:'api.os.uk', signedAt:'2026-06-11T09:09:02Z',
+        value:'MEUCIQD2pak9wq8Lr3rJpZ0kref2bQ7nVxT1mYc9pL0aQ2KdWg==' },
+      claims:{ uprn:UPRN_ID, address:{ line1:'14 Elm Grove', locality:'Redland', town:'Bristol', postcode:'BS6 5DB' },
+        classification:'RD04', easting:358205, northing:174894, lat:51.4712, lng:-2.6003, match:'EXACT', confidence:0.98 } },
+
+    { id:'epc', name:'Energy Performance (EPC)', service:'EPC Register', endpoint:'GET /v1/property/epc',
+      signed:true, gate:'pack',
+      sig:{ alg:'ES256', kid:'epc-2024-key-3', iss:'epc.opendatacommunities.org', signedAt:'2026-06-11T09:14:22Z',
+        value:'MEQCIH8nZ1cQ4rLl9aQk7mY0v1Ae2Tn0pXc8bWq3rJZ0kKdRf==' },
+      claims:{ uprn:UPRN_ID, lmkKey:'1234-5678-9012-3456-7890', currentEnergyRating:'C', currentEnergyEfficiency:72,
+        potentialEnergyRating:'B', potentialEnergyEfficiency:84, co2EmissionsCurrent:2.8,
+        inspectionDate:'2021-07-14', lodgementDate:'2021-07-20', expiryDate:'2031-07-13' } },
+
+    { id:'council_tax', name:'Council tax band', service:'VOA', endpoint:'GET /v1/property/council-tax',
+      signed:false, gate:'pack',
+      sig:{ note:'unsigned — the VOA does not yet issue a signature block; value captured manually and flagged for re-verification' },
+      claims:{ uprn:UPRN_ID, band:'D', localAuthority:'Bristol City Council', annualCharge:2304.18, taxYear:'2026-27', source:'VOA' } },
+
+    { id:'coalfield', name:'Mining / coalfield', service:'Coal Authority', endpoint:'GET /v1/mining/coalfield',
+      signed:true, gate:'pack',
+      sig:{ alg:'ES256', kid:'coal-auth-key-1', iss:'coalauthority.gov.uk', signedAt:'2026-06-11T09:15:03Z',
+        value:'MEUCIQCxN0pTr8kQv2mLf0pZ7gWq3rJZ1cQ4rLl9aYk7mY0v1A==' },
+      claims:{ uprn:UPRN_ID, coalMiningReportRequired:false, surfaceHazardRisk:'NONE', developmentHighRiskArea:false,
+        status:'OUTSIDE', reference:'CMR-2026-008812' } },
+
+    { id:'title_register', name:'Title register & ownership', service:'HM Land Registry', endpoint:'GET /v1/title/ABC12345',
+      signed:true, gate:'pack',
+      sig:{ alg:'ES256', kid:'hmlr-key-7', iss:'hmlandregistry.gov.uk', signedAt:'2026-06-11T09:16:48Z',
+        value:'MEYCIQDpL3xVbN8Qz9rT4uKpW1cWq3rJZ0kref2bYc9pL0aQ2KdRg==' },
+      claims:{ titleNumber:'ABC12345', uprn:UPRN_ID, tenure:'Freehold', classOfTitle:'ABSOLUTE',
+        registeredProprietors:['A. N. Seller'], priorityFrom:'2018-03-02', restrictions:0, charges:1 } },
+
+    { id:'chain', name:'Property chain', service:'ViewMyChain', endpoint:'POST /api/v1/opda/chains',
+      signed:true, gate:'chain',
+      sig:{ alg:'ES256', kid:'vmc-key-1', iss:'viewmychain.com', signedAt:'2026-06-11T09:10:12Z',
+        value:'MEUCIQDvMc3pTr8kQv2mLf0pZ7gWq3rJZ1cQ4rLl9aYk7mY0v1AiIA==' },
+      claims:{ uprn:UPRN_ID, chainLength:3,
+        properties:[
+          { uprn:'200001858100', address:'First-time buyer', position:'bottom', ours:false },
+          { uprn:UPRN_ID, address:'14 Elm Grove, Redland, Bristol BS6 5DB', position:'this sale', ours:true },
+          { uprn:'200001858900', address:'Top of chain', position:'top', ours:false }],
+        milestones:[{ label:'Offer Accepted', date:'2026-05-12' },{ label:'Sold STC', date:'2026-05-20' }] } },
+
+    { id:'source_of_funds', name:'Source of funds', service:'IDV · Open Banking', endpoint:'GET /v1/source-of-funds',
+      signed:true, gate:'sof',
+      sig:{ alg:'ES256', kid:'idv-key-4', iss:'idv-provider.io', signedAt:'2026-06-11T10:02:15Z',
+        value:'MEUCIQC7mB1aWqNf0pV2kZ9rL8Wq3rJZ1cQ4rLl9aYk7mY0v1Ae2==' },
+      claims:{ subject:'buyer', depositAmount:62000, currency:'GBP', evidencedSource:'Savings + gift',
+        traced:true, accountVerified:true, provider:'open-banking' } },
+
+    { id:'surveys', name:'Survey documents', service:'Documents store', endpoint:'GET /documents?type=survey',
+      signed:true, gate:'surv',
+      sig:{ alg:'ES256', kid:'docs-key-2', iss:'documents.smartpropdata', signedAt:'2026-06-11T11:20:51Z',
+        value:'MEQCIBxW9pLqT3mK7nZ0vQ1f9Wq3rJZ0kref2bYc9pL0aQ2KdRg4rLl==' },
+      claims:{ uprn:UPRN_ID, store:'pre-signed-s3', count:2,
+        documents:[ { name:'RICS Level 2 survey.pdf', type:'RICS_L2', size:2516582, sha256:'a3f9c0e2…b71d' },
+          { name:'Floor plan.pdf', type:'FLOORPLAN', size:491520, sha256:'7b2188af…0c34' } ] } },
+
+    // Detached JWS (x-jws-signature header) — real value populated by the BFF from realData.sellerPack.jwsSignature
+    { id:'property_pack', name:'Property pack', service:'Sprift / PDI', endpoint:'POST /property-pack/uprn',
+      signed:true, gate:'sellerPack',
+      sig:{ alg:'ES256', kid:'(from x-jws-signature header)', iss:'Sprift / PDI', signedAt:'', value:'' },
+      claims:{ note:'Detached JWS — signature covers the full property pack payload. Real value available in realData.sellerPack.jwsSignature once the Seller sources the pack.' } }
+  ]
+};

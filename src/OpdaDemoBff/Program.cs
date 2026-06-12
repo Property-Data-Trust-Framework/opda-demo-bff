@@ -52,7 +52,7 @@ builder.Services.AddKeyedSingleton<IOpdaClient>("pdi", (_, _) =>
         Scope           = Environment.GetEnvironmentVariable("PDI_SCOPE") ?? "property-pack",
     }).GetAwaiter().GetResult());
 
-// Sprift — base URL and scope TBD pending confirmation of their PDTF sandbox endpoint.
+// Sprift — mTLS + private_key_jwt (PDTF directory, scope: test) + x-api-key header (sandbox only).
 // Skipped if SPRIFT_BASE_URL is not configured.
 var spriftBaseUrl = Environment.GetEnvironmentVariable("SPRIFT_BASE_URL") ?? "";
 if (!string.IsNullOrEmpty(spriftBaseUrl))
@@ -60,13 +60,15 @@ if (!string.IsNullOrEmpty(spriftBaseUrl))
     builder.Services.AddKeyedSingleton<IOpdaClient>("sprift", (_, _) =>
         OpdaClient.CreateAsync(new OpdaClientConfig
         {
-            ApiBaseUrl     = spriftBaseUrl,
-            ClientCertPath = Environment.GetEnvironmentVariable("OPDA_CLIENT_CERT_PATH") ?? "",
-            ClientKeyPath  = Environment.GetEnvironmentVariable("OPDA_CLIENT_KEY_PATH") ?? "",
-            SigningKeyPath  = Environment.GetEnvironmentVariable("OPDA_SIGNING_KEY_PATH") ?? "",
-            ClientId        = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
-            TokenEndpoint   = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
-            Scope           = Environment.GetEnvironmentVariable("SPRIFT_SCOPE") ?? "",
+            ApiBaseUrl      = spriftBaseUrl,
+            ClientCertPath  = Environment.GetEnvironmentVariable("OPDA_CLIENT_CERT_PATH") ?? "",
+            ClientKeyPath   = Environment.GetEnvironmentVariable("OPDA_CLIENT_KEY_PATH") ?? "",
+            SigningKeyPath   = Environment.GetEnvironmentVariable("OPDA_SIGNING_KEY_PATH") ?? "",
+            ClientId         = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
+            TokenEndpoint    = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
+            Scope            = Environment.GetEnvironmentVariable("SPRIFT_SCOPE") ?? "property-pack",
+            ApiKeyPath       = Environment.GetEnvironmentVariable("SPRIFT_API_KEY_PATH"),
+            ApiKeyHeaderName = "x-api-key",
         }).GetAwaiter().GetResult());
 }
 
@@ -188,10 +190,50 @@ app.MapPost("/demo-api/source-of-funds", async (IOpdaClient opda) =>
     return result is not null ? Results.Ok(result) : Results.StatusCode(502);
 });
 
+// ── GET /demo-api/property-pack/{uprn} ───────────────────────────────────────
+// Unified property pack: routes to PDI for known sample UPRNs, Sprift for all others.
+// Response: { source: "sprift"|"pdi", data: <upstream response>, jwsSignature? }
+
+var pdiSampleUprns = new HashSet<string>
+{
+    "100070482318","100022539219","100071300442","10093560622", "100022521703",
+    "217048506",   "100022598809","10090437590", "217030257",  "202065685",
+    "100022725034","100022750316","217075263",   "34095084",   "100070405179",
+    "217018783",   "10091059238", "100022793956","217070918",  "100071428730",
+    "217067551",   "200015088",   "100022599518","100070446046","100071271440",
+    "217071178",   "100070385755","217016110",   "100022802693","100022780345",
+    "10033622251", "34019425",    "5009691",     "100070561271","100022778424",
+    "12003281",    "100022528887","202064990",   "202219254",  "5114578",
+    "34171489",    "100022558342","100070565556","100022562980","100022530012",
+    "100022540400","200082387",   "217028345",   "217126195",  "5167116",
+};
+
+app.MapGet("/demo-api/property-pack/{uprn}", async (
+    string uprn,
+    [FromKeyedServices("pdi")] IOpdaClient pdi,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    if (!pdiSampleUprns.Contains(uprn) &&
+        ctx.RequestServices.IsKeyedService(typeof(IOpdaClient), "sprift"))
+    {
+        var sprift = ctx.RequestServices.GetRequiredKeyedService<IOpdaClient>("sprift");
+        var spriftResult = await sprift.GetAsync($"/metainformation/v1.0.0/uprn/{uprn}", ct);
+        if (spriftResult is not null)
+            return Results.Ok(new { source = "sprift", data = spriftResult });
+    }
+
+    var (pdiBody, pdiJws) = await pdi.PostWithJwsAsync(
+        "/opda-opaque/appraisal/v1/property-pack/uprn", new { uprn }, ct);
+    if (pdiBody is not null)
+        return Results.Ok(new { source = "pdi", data = pdiBody, jwsSignature = pdiJws });
+
+    return Results.StatusCode(502);
+});
+
 // ── GET /demo-api/pdi/pack/{uprn} ────────────────────────────────────────────
 // Full PDTF v3.5.0 property pack from Property Deals Insight.
-// Optional query params mirror the PDI request body: propertyType, internalAreaSqM,
-// bedrooms, bathrooms, receptions. All are auto-enriched by PDI when omitted.
+// Response: { data: <pack>, jwsSignature: <x-jws-signature header> }
 
 app.MapGet("/demo-api/pdi/pack/{uprn}", async (
     string uprn,
@@ -203,42 +245,35 @@ app.MapGet("/demo-api/pdi/pack/{uprn}", async (
     [FromKeyedServices("pdi")] IOpdaClient pdi,
     CancellationToken ct) =>
 {
-    var body = new
-    {
-        uprn,
-        propertyType,
-        internalAreaSqM,
-        bedrooms,
-        bathrooms,
-        receptions,
-    };
-    var result = await pdi.PostAsync("/opda-opaque/appraisal/v1/property-pack/uprn", body, ct);
-    return result is not null ? Results.Ok(result) : Results.StatusCode(502);
+    var body = new { uprn, propertyType, internalAreaSqM, bedrooms, bathrooms, receptions };
+    var (data, jws) = await pdi.PostWithJwsAsync("/opda-opaque/appraisal/v1/property-pack/uprn", body, ct);
+    return data is not null ? Results.Ok(new { data, jwsSignature = jws }) : Results.StatusCode(502);
 });
 
 // ── GET /demo-api/pdi/state/{uprn} ───────────────────────────────────────────
-// Materialised current-state view from PDI: address, valuation AVM, EPC, council
-// tax, flood risk, planning history, sold prices, utilities.
+// Materialised current-state view from PDI.
+// Response: { data: <state>, jwsSignature: <x-jws-signature header> }
 
 app.MapGet("/demo-api/pdi/state/{uprn}", async (
     string uprn,
     [FromKeyedServices("pdi")] IOpdaClient pdi,
     CancellationToken ct) =>
 {
-    var result = await pdi.GetAsync($"/opda-opaque/current-state/{uprn}", ct);
-    return result is not null ? Results.Ok(result) : Results.StatusCode(502);
+    var (data, jws) = await pdi.GetWithJwsAsync($"/opda-opaque/current-state/{uprn}", ct);
+    return data is not null ? Results.Ok(new { data, jwsSignature = jws }) : Results.StatusCode(502);
 });
 
 // ── GET /demo-api/pdi/claims/{uprn} ──────────────────────────────────────────
 // PDI-signed verified claims array (trust_framework: uk_pdtf).
+// Response: { data: <claims[]>, jwsSignature: <x-jws-signature header> }
 
 app.MapGet("/demo-api/pdi/claims/{uprn}", async (
     string uprn,
     [FromKeyedServices("pdi")] IOpdaClient pdi,
     CancellationToken ct) =>
 {
-    var result = await pdi.GetAsync($"/opda-opaque/claims/{uprn}", ct);
-    return result is not null ? Results.Ok(result) : Results.StatusCode(502);
+    var (data, jws) = await pdi.GetWithJwsAsync($"/opda-opaque/claims/{uprn}", ct);
+    return data is not null ? Results.Ok(new { data, jwsSignature = jws }) : Results.StatusCode(502);
 });
 
 // ── Sprift routes ─────────────────────────────────────────────────────────────
@@ -263,7 +298,7 @@ app.MapGet("/demo-api/sprift/material-information/{uprn}", async (
     if (!ctx.RequestServices.IsKeyedService(typeof(IOpdaClient), "sprift"))
         return SpriftUnconfigured();
     var sprift = ctx.RequestServices.GetRequiredKeyedService<IOpdaClient>("sprift");
-    var result = await sprift.GetAsync($"/property/{uprn}/materialinformation", ct);
+    var result = await sprift.GetAsync($"/metainformation/v1.0.0/uprn/{uprn}", ct);
     return result is not null ? Results.Ok(result) : Results.StatusCode(502);
 });
 
