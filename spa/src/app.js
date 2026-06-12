@@ -635,9 +635,9 @@ function initMap(){
 function setView(v){
   state.view=v;
   document.querySelectorAll('#viewseg button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
-  document.getElementById('flowsView').classList.toggle('active',v==='flows');
-  document.getElementById('passportView').classList.toggle('active',v==='passport');
-  document.getElementById('payloadsView').classList.toggle('active',v==='payloads');
+  document.getElementById('flowsView')?.classList.toggle('active',v==='flows');
+  document.getElementById('passportView')?.classList.toggle('active',v==='passport');
+  document.getElementById('payloadsView')?.classList.toggle('active',v==='payloads');
   if(v==='passport'){ renderPassport(); initMap(); }
   if(v==='payloads') renderPayloads();
   persist();
