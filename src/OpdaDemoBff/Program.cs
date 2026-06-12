@@ -215,13 +215,15 @@ app.MapGet("/demo-api/property-pack/{uprn}", async (
     HttpContext ctx,
     CancellationToken ct) =>
 {
-    if (!pdiSampleUprns.Contains(uprn) &&
-        ctx.RequestServices.IsKeyedService(typeof(IOpdaClient), "sprift"))
+    if (!pdiSampleUprns.Contains(uprn))
     {
-        var sprift = ctx.RequestServices.GetRequiredKeyedService<IOpdaClient>("sprift");
-        var spriftResult = await sprift.GetAsync($"/metainformation/v1.0.0/uprn/{uprn}", ct);
-        if (spriftResult is not null)
-            return Results.Ok(new { source = "sprift", data = spriftResult });
+        var sprift = ctx.RequestServices.GetKeyedService<IOpdaClient>("sprift");
+        if (sprift is not null)
+        {
+            var spriftResult = await sprift.GetAsync($"/metainformation/v1.0.0/uprn/{uprn}", ct);
+            if (spriftResult is not null)
+                return Results.Ok(new { source = "sprift", data = spriftResult });
+        }
     }
 
     var (pdiBody, pdiJws) = await pdi.PostWithJwsAsync(
@@ -296,9 +298,8 @@ app.MapGet("/demo-api/sprift/material-information/{uprn}", async (
     HttpContext ctx,
     CancellationToken ct) =>
 {
-    if (!ctx.RequestServices.IsKeyedService(typeof(IOpdaClient), "sprift"))
-        return SpriftUnconfigured();
-    var sprift = ctx.RequestServices.GetRequiredKeyedService<IOpdaClient>("sprift");
+    var sprift = ctx.RequestServices.GetKeyedService<IOpdaClient>("sprift");
+    if (sprift is null) return SpriftUnconfigured();
     var result = await sprift.GetAsync($"/metainformation/v1.0.0/uprn/{uprn}", ct);
     return result is not null ? Results.Ok(result) : Results.StatusCode(502);
 });
@@ -312,9 +313,8 @@ app.MapGet("/demo-api/sprift/property/{uprn}", async (
     HttpContext ctx,
     CancellationToken ct) =>
 {
-    if (!ctx.RequestServices.IsKeyedService(typeof(IOpdaClient), "sprift"))
-        return SpriftUnconfigured();
-    var sprift = ctx.RequestServices.GetRequiredKeyedService<IOpdaClient>("sprift");
+    var sprift = ctx.RequestServices.GetKeyedService<IOpdaClient>("sprift");
+    if (sprift is null) return SpriftUnconfigured();
     var result = await sprift.GetAsync($"/property/{uprn}/search", ct);
     return result is not null ? Results.Ok(result) : Results.StatusCode(502);
 });
@@ -338,9 +338,8 @@ app.MapGet("/demo-api/sprift/comparables/{uprn}", async (
     HttpContext ctx,
     CancellationToken ct) =>
 {
-    if (!ctx.RequestServices.IsKeyedService(typeof(IOpdaClient), "sprift"))
-        return SpriftUnconfigured();
-    var sprift = ctx.RequestServices.GetRequiredKeyedService<IOpdaClient>("sprift");
+    var sprift = ctx.RequestServices.GetKeyedService<IOpdaClient>("sprift");
+    if (sprift is null) return SpriftUnconfigured();
     var listingStatus = status ?? "available";
     var qs = new List<string>();
     if (bedroom is not null)       qs.Add($"bedroom={bedroom}");
