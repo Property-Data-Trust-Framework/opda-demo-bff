@@ -145,8 +145,14 @@ const Blocks = {
   search(b){
     if(state.addr){
       const addrData = typeof realData!=='undefined' && realData.address?.data?.[0];
-      const displayAddr = addrData?.address || '14 Elm Grove, Redland, Bristol BS6 5DB';
-      const displayUprn = addrData?.uprn || '—';
+      if(!addrData){
+        const results = typeof realData!=='undefined' && realData.addressResults;
+        if(!results) return card(b,`<div class="searchwrap"><div style="color:var(--ink-3);font-size:13.5px;padding:6px 0;display:flex;align-items:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>Searching…</div></div>`);
+        const items = results.map((r,i)=>`<button class="addrbtn" data-addrpick="${i}"><span class="addrline">${r.address}</span><span class="chip mono" style="font-size:10.5px;margin-left:auto;flex:none;">${r.uprn}</span></button>`).join('');
+        return card(b,`<div class="addrpick"><div class="pickhead">${svg('pin')} ${results.length} properties found — select the correct one</div>${items}<div style="margin-top:10px;"><button class="linkbtn" data-searchreset>${svg('refresh',2)} new search</button></div></div>`);
+      }
+      const displayAddr = addrData.address || '14 Elm Grove, Redland, Bristol BS6 5DB';
+      const displayUprn = addrData.uprn || '—';
       return card(b,`<div class="resolved"><div class="bigaddr">${displayAddr}</div>
         <div class="chips"><span class="chip">${seal('ok','sm')}UPRN <b class="mono" style="margin-left:3px">${displayUprn}</b></span><span class="chip">format valid · resolved ${state.addr.time}</span></div>
         <div style="margin-top:13px;"><button class="linkbtn" data-searchreset>${svg('refresh',2)} new search</button></div></div>`);
@@ -339,12 +345,13 @@ const ROLES = [
         fired:()=>{
           const p=typeof realData!=='undefined'&&realData.pack;
           const epcBand=p?.epc?.data?.currentEnergyEfficiencyBand??'C';
-          const epcScore=p?.epc?.data?.currentEnergyEfficiencyScore??72;
-          const ctBand=p?.councilTax?.data?.band??'D';
-          const coalStatus=p?.coalfield?.data?.status??'OFF';
-          const tenure=p?.titleRegister?.data?.OCSummaryData?.TitleDetails?.TenureType??'Freehold';
+          const ctBand=p?.councilTax?.data?.councilTaxBand??'D';
+          const coalfieldRaw=p?.coalfield?.data?.coalfieldStatus;
+          const coalStatus=coalfieldRaw==='ON_COALFIELD'?'ON':coalfieldRaw==='OFF_COALFIELD'?'OFF':(coalfieldRaw??'—');
+          const isLeasehold=p?.titleRegister?.data?.OCSummaryData?.RegisterEntryIndicators?.LeaseHoldTitleIndicator;
+          const tenure=isLeasehold?'Leasehold':'Freehold';
           return `<div class="chips">
-            <span class="chip">${seal('ok','sm')}EPC ${epcBand} · ${epcScore}</span>
+            <span class="chip">${seal('ok','sm')}EPC ${epcBand}</span>
             <span class="chip">${seal(ctBand==='D'?'warn':'ok','sm')}Council tax ${ctBand}</span>
             <span class="chip">${seal('ok','sm')}Coalfield ${coalStatus}</span>
             <span class="chip">${seal('ok','sm')}${tenure}</span>

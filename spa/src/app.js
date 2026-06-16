@@ -399,11 +399,13 @@ function updateTopSearch(){
   const s=document.getElementById('topSearch'); if(!s) return;
   if(state.addr){
     s.classList.remove('empty');
-    const addrLine = (typeof realData!=='undefined' && realData.address?.data?.[0]?.address) || '';
+    const addrLine = state.addr.address || '';
     const addrParts = addrLine ? addrLine.split(',') : [];
-    document.getElementById('topAddr').textContent = addrParts.length ? addrParts[0].trim() : '14 Elm Grove';
-    document.getElementById('topSub').textContent = addrParts.length > 1 ? '· ' + addrParts.slice(1).join(',').trim() : '· Redland, Bristol';
-    document.getElementById('topUprn').style.display='';
+    document.getElementById('topAddr').textContent = addrParts.length ? addrParts[0].trim() : 'No property resolved';
+    document.getElementById('topSub').textContent = addrParts.length > 1 ? '· ' + addrParts.slice(1).join(',').trim() : '';
+    const uprnNum = document.getElementById('topUprnNum');
+    if(uprnNum) uprnNum.textContent = state.addr.uprn || '—';
+    document.getElementById('topUprn').style.display = state.addr.uprn ? '' : 'none';
   } else {
     s.classList.add('empty');
     document.getElementById('topAddr').textContent='No property resolved';
@@ -610,12 +612,31 @@ function inspectPayload(id){
     el.classList.add('plflash'); setTimeout(()=>el.classList.remove('plflash'),1500);
   }
 }
+function bngToLatLng(E,N){
+  const a=6377563.396,b=6356256.909,F0=0.9996012717;
+  const lat0=0.85521133347,lng0=-0.034906585,N0=-100000,E0=400000;
+  const e2=1-(b*b)/(a*a),n=(a-b)/(a+b),n2=n*n,n3=n*n*n;
+  let lat=lat0,M=0;
+  do{lat=(N-N0-M)/(a*F0)+lat;M=b*F0*((1+n+5/4*n2+5/4*n3)*(lat-lat0)-(3*n+3*n2+21/8*n3)*Math.sin(lat-lat0)*Math.cos(lat+lat0)+(15/8*n2+15/8*n3)*Math.sin(2*(lat-lat0))*Math.cos(2*(lat+lat0))-35/24*n3*Math.sin(3*(lat-lat0))*Math.cos(3*(lat+lat0)));}while(Math.abs(N-N0-M)>=0.00001);
+  const sl=Math.sin(lat),cl=Math.cos(lat),tl=Math.tan(lat);
+  const nu=a*F0/Math.sqrt(1-e2*sl*sl),rho=a*F0*(1-e2)/Math.pow(1-e2*sl*sl,1.5),eta2=nu/rho-1;
+  const dE=E-E0,dE3=dE*dE*dE,dE5=dE3*dE*dE,dE7=dE5*dE*dE;
+  const VII=tl/(2*rho*nu),VIII=tl/(24*rho*nu*nu*nu)*(5+3*tl*tl+eta2-9*tl*tl*eta2);
+  const IX=tl/(720*rho*Math.pow(nu,5))*(61+90*tl*tl+45*Math.pow(tl,4));
+  const X=1/(cl*nu),XI=1/(cl*6*nu*nu*nu)*(nu/rho+2*tl*tl);
+  const XII=1/(cl*120*Math.pow(nu,5))*(5+28*tl*tl+24*Math.pow(tl,4));
+  const XIIA=1/(cl*5040*Math.pow(nu,7))*(61+662*tl*tl+1320*Math.pow(tl,4)+720*Math.pow(tl,6));
+  return[(lat-VII*dE*dE+VIII*Math.pow(dE,4)-IX*Math.pow(dE,6))*180/Math.PI,(lng0+X*dE-XI*dE3+XII*dE5-XIIA*dE7)*180/Math.PI];
+}
 let _map = null;
 function initMap(){
   const el = document.getElementById('leaflet-map');
   if(!el || !window.L) return;
-  const lat = (typeof realData!=='undefined' && realData.uprn?.data?.lat) || 51.4712;
-  const lng = (typeof realData!=='undefined' && realData.uprn?.data?.lng) || -2.6003;
+  let lat=51.4712, lng=-2.6003;
+  const addr=typeof realData!=='undefined'&&realData.address?.data?.[0];
+  if(addr?.xCoordinate&&addr?.yCoordinate){
+    try{[lat,lng]=bngToLatLng(addr.xCoordinate,addr.yCoordinate);}catch(e){}
+  }
   if(_map){ _map.remove(); _map = null; }
   _map = L.map(el, { zoomControl:true, attributionControl:true });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -662,18 +683,28 @@ function searchAddress(){
   state.addr={time:nowHM()}; mark(state.addr.time+'|places.address.resolved'); sync();
   bffFetch('/demo-api/address?q='+encodeURIComponent(q))
     .then(r=>{
-      if(r){
-        realData.address=r;
-        renderFlow();
-        const uprn = r.data?.[0]?.uprn || '100091225620';
-        const el = document.getElementById('topUprn');
-        if(el) el.textContent = 'UPRN ' + uprn;
-        bffFetch(`/demo-api/chain/${uprn}`)
-          .then(cr=>{ if(cr){ realData.chain=cr; renderChain(); } });
+      if(r && r.data && r.data.length){
+        if(r.data.length === 1){
+          selectAddress(r.data[0]);
+        } else {
+          realData.addressResults = r.data;
+          renderFlow();
+        }
       }
     });
 }
-function resetSearch(){ state.addr=null; sync(); }
+function selectAddress(item){
+  realData.address = { data: [item] };
+  realData.addressResults = null;
+  state.addr = Object.assign(state.addr || {time:nowHM()}, {
+    uprn: item.uprn,
+    address: item.address
+  });
+  sync();
+  bffFetch(`/demo-api/chain/${item.uprn || '100091225620'}`)
+    .then(cr=>{ if(cr){ realData.chain=cr; renderChain(); } });
+}
+function resetSearch(){ state.addr=null; realData.address=null; realData.addressResults=null; sync(); }
 function inviteSeller(){ if(state.invited) return; state.invited={time:nowHM()}; mark(state.invited.time+'|identity.invite.sent'); sync(); }
 function resetInvite(){ state.invited=null; sync(); }
 function publishListing(){ if(state.published) return; state.published={time:nowHM()}; mark(state.published.time+'|listing.published'); sync(); }
@@ -722,6 +753,8 @@ document.body.addEventListener('click',e=>{
     if(sugg){ const inp=document.getElementById('addrInput'); if(inp) inp.value=sugg.textContent.trim(); }
     searchAddress(); return;
   }
+  const pick=e.target.closest('[data-addrpick]');
+  if(pick){ const item=(typeof realData!=='undefined'&&realData.addressResults)?.[parseInt(pick.dataset.addrpick)]; if(item) selectAddress(item); return; }
   if(e.target.closest('[data-searchreset]')){ resetSearch(); return; }
   if(e.target.closest('[data-invite]')){ inviteSeller(); return; }
   if(e.target.closest('[data-invitereset]')){ resetInvite(); return; }
