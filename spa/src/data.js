@@ -118,7 +118,7 @@ const Blocks = {
   map(b){
     return `<div class="card s${b.span||6} mapcard">
       ${b.title?`<div class="chead"><span class="ct">${b.title}</span></div>`:''}
-      <div id="leaflet-map" style="height:200px;border-radius:8px;overflow:hidden;"></div>
+      <div class="mapslot" style="height:200px;border-radius:8px;overflow:hidden;"></div>
     </div>`;
   },
   stream(b){
@@ -149,7 +149,7 @@ const Blocks = {
         const results = typeof realData!=='undefined' && realData.addressResults;
         if(!results) return card(b,`<div class="searchwrap"><div style="color:var(--ink-3);font-size:13.5px;padding:6px 0;display:flex;align-items:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>Searching…</div></div>`);
         const items = results.map((r,i)=>`<button class="addrbtn" data-addrpick="${i}"><span class="addrline">${r.address}</span><span class="chip mono" style="font-size:10.5px;margin-left:auto;flex:none;">${r.uprn}</span></button>`).join('');
-        return card(b,`<div class="addrpick"><div class="pickhead">${svg('pin')} ${results.length} properties found — select the correct one</div>${items}<div style="margin-top:10px;"><button class="linkbtn" data-searchreset>${svg('refresh',2)} new search</button></div></div>`);
+        return card(b,`<div class="addrpick"><div class="pickhead">${svg('pin')} ${results.length} properties found — select the correct one</div><div class="addrlist">${items}</div><div style="margin-top:10px;"><button class="linkbtn" data-searchreset>${svg('refresh',2)} new search</button></div></div>`);
       }
       const displayAddr = addrData.address || '14 Elm Grove, Redland, Bristol BS6 5DB';
       const displayUprn = addrData.uprn || '—';

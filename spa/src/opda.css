@@ -430,6 +430,7 @@ h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;}
   border-radius:var(--pill);padding:4px 13px;cursor:pointer;transition:.14s;}
 .sugg:hover{border-color:var(--amber-ring);color:var(--amber-d);border-style:solid;background:var(--amber-bg);}
 .addrpick{display:flex;flex-direction:column;gap:5px;}
+.addrlist{display:flex;flex-direction:column;gap:5px;max-height:264px;overflow-y:auto;padding-right:2px;}
 .pickhead{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px;margin-bottom:6px;}
 .pickhead svg{width:14px;height:14px;flex:none;}
 .addrbtn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 13px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--paper);cursor:pointer;transition:.12s;}

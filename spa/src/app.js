@@ -306,6 +306,7 @@ function renderFlow(){
   renderNodes(state.role);
   renderChain();
   updateTopSearch();
+  initMap();
 }
 function render(){ renderRail(); renderFlow(); }
 
@@ -399,6 +400,7 @@ function updateTopSearch(){
   const s=document.getElementById('topSearch'); if(!s) return;
   if(state.addr){
     s.classList.remove('empty');
+    s.style.display='';
     const addrLine = state.addr.address || '';
     const addrParts = addrLine ? addrLine.split(',') : [];
     document.getElementById('topAddr').textContent = addrParts.length ? addrParts[0].trim() : 'No property resolved';
@@ -408,9 +410,7 @@ function updateTopSearch(){
     document.getElementById('topUprn').style.display = state.addr.uprn ? '' : 'none';
   } else {
     s.classList.add('empty');
-    document.getElementById('topAddr').textContent='No property resolved';
-    document.getElementById('topSub').textContent='· search in the Estate Agent flow';
-    document.getElementById('topUprn').style.display='none';
+    s.style.display='none';
   }
 }
 
@@ -612,33 +612,98 @@ function inspectPayload(id){
     el.classList.add('plflash'); setTimeout(()=>el.classList.remove('plflash'),1500);
   }
 }
-function bngToLatLng(E,N){
-  const a=6377563.396,b=6356256.909,F0=0.9996012717;
-  const lat0=0.85521133347,lng0=-0.034906585,N0=-100000,E0=400000;
-  const e2=1-(b*b)/(a*a),n=(a-b)/(a+b),n2=n*n,n3=n*n*n;
-  let lat=lat0,M=0;
-  do{lat=(N-N0-M)/(a*F0)+lat;M=b*F0*((1+n+5/4*n2+5/4*n3)*(lat-lat0)-(3*n+3*n2+21/8*n3)*Math.sin(lat-lat0)*Math.cos(lat+lat0)+(15/8*n2+15/8*n3)*Math.sin(2*(lat-lat0))*Math.cos(2*(lat+lat0))-35/24*n3*Math.sin(3*(lat-lat0))*Math.cos(3*(lat+lat0)));}while(Math.abs(N-N0-M)>=0.00001);
-  const sl=Math.sin(lat),cl=Math.cos(lat),tl=Math.tan(lat);
-  const nu=a*F0/Math.sqrt(1-e2*sl*sl),rho=a*F0*(1-e2)/Math.pow(1-e2*sl*sl,1.5),eta2=nu/rho-1;
-  const dE=E-E0,dE3=dE*dE*dE,dE5=dE3*dE*dE,dE7=dE5*dE*dE;
-  const VII=tl/(2*rho*nu),VIII=tl/(24*rho*nu*nu*nu)*(5+3*tl*tl+eta2-9*tl*tl*eta2);
-  const IX=tl/(720*rho*Math.pow(nu,5))*(61+90*tl*tl+45*Math.pow(tl,4));
-  const X=1/(cl*nu),XI=1/(cl*6*nu*nu*nu)*(nu/rho+2*tl*tl);
-  const XII=1/(cl*120*Math.pow(nu,5))*(5+28*tl*tl+24*Math.pow(tl,4));
-  const XIIA=1/(cl*5040*Math.pow(nu,7))*(61+662*tl*tl+1320*Math.pow(tl,4)+720*Math.pow(tl,6));
-  return[(lat-VII*dE*dE+VIII*Math.pow(dE,4)-IX*Math.pow(dE,6))*180/Math.PI,(lng0+X*dE-XI*dE3+XII*dE5-XIIA*dE7)*180/Math.PI];
-}
-let _map = null;
-function initMap(){
-  const el = document.getElementById('leaflet-map');
-  if(!el || !window.L) return;
-  let lat=51.4712, lng=-2.6003;
-  const addr=typeof realData!=='undefined'&&realData.address?.data?.[0];
-  if(addr?.xCoordinate&&addr?.yCoordinate){
-    try{[lat,lng]=bngToLatLng(addr.xCoordinate,addr.yCoordinate);}catch(e){}
+// Convert an OSGB36 National Grid easting/northing (the xCoordinate/yCoordinate the
+// address + UPRN APIs return) to WGS84 lat/lon for Leaflet: OS transverse-Mercator
+// inverse on the Airy 1830 ellipsoid, then a Helmert datum shift to WGS84.
+function osgbToLatLon(E, N){
+  const a=6377563.396, b=6356256.909, F0=0.9996012717;
+  const lat0=49*Math.PI/180, lon0=-2*Math.PI/180;
+  const N0=-100000, E0=400000;
+  const e2=1-(b*b)/(a*a), n=(a-b)/(a+b);
+  let lat=lat0, M=0;
+  do {
+    lat=(N-N0-M)/(a*F0)+lat;
+    const Ma=(1+n+1.25*n*n+1.25*n*n*n)*(lat-lat0);
+    const Mb=(3*n+3*n*n+(21/8)*n*n*n)*Math.sin(lat-lat0)*Math.cos(lat+lat0);
+    const Mc=((15/8)*n*n+(15/8)*n*n*n)*Math.sin(2*(lat-lat0))*Math.cos(2*(lat+lat0));
+    const Md=(35/24)*n*n*n*Math.sin(3*(lat-lat0))*Math.cos(3*(lat+lat0));
+    M=b*F0*(Ma-Mb+Mc-Md);
+  } while (Math.abs(N-N0-M)>=0.00001);
+  const sinLat=Math.sin(lat), cosLat=Math.cos(lat), tanLat=Math.tan(lat);
+  const nu=a*F0/Math.sqrt(1-e2*sinLat*sinLat);
+  const rho=a*F0*(1-e2)/Math.pow(1-e2*sinLat*sinLat,1.5);
+  const eta2=nu/rho-1;
+  const VII=tanLat/(2*rho*nu);
+  const VIII=tanLat/(24*rho*Math.pow(nu,3))*(5+3*tanLat*tanLat+eta2-9*tanLat*tanLat*eta2);
+  const IX=tanLat/(720*rho*Math.pow(nu,5))*(61+90*tanLat*tanLat+45*Math.pow(tanLat,4));
+  const secLat=1/cosLat;
+  const X=secLat/nu;
+  const XI=secLat/(6*Math.pow(nu,3))*(nu/rho+2*tanLat*tanLat);
+  const XII=secLat/(120*Math.pow(nu,5))*(5+28*tanLat*tanLat+24*Math.pow(tanLat,4));
+  const XIIA=secLat/(5040*Math.pow(nu,7))*(61+662*tanLat*tanLat+1320*Math.pow(tanLat,4)+720*Math.pow(tanLat,6));
+  const dE=E-E0;
+  let latA=lat-VII*dE*dE+VIII*Math.pow(dE,4)-IX*Math.pow(dE,6);
+  let lonA=lon0+X*dE-XI*Math.pow(dE,3)+XII*Math.pow(dE,5)-XIIA*Math.pow(dE,7);
+  // Helmert OSGB36 (Airy 1830) -> WGS84
+  const eSqA=(a*a-b*b)/(a*a);
+  const nuA=a/Math.sqrt(1-eSqA*Math.sin(latA)*Math.sin(latA));
+  const x1=nuA*Math.cos(latA)*Math.cos(lonA);
+  const y1=nuA*Math.cos(latA)*Math.sin(lonA);
+  const z1=(1-eSqA)*nuA*Math.sin(latA);
+  const tx=446.448, ty=-125.157, tz=542.060, s=-20.4894e-6;
+  const rx=0.1502/3600*Math.PI/180, ry=0.2470/3600*Math.PI/180, rz=0.8421/3600*Math.PI/180;
+  const s1=1+s;
+  const x2=tx+x1*s1-y1*rz+z1*ry;
+  const y2=ty+x1*rz+y1*s1-z1*rx;
+  const z2=tz-x1*ry+y1*rx+z1*s1;
+  const aW=6378137, bW=6356752.3142;
+  const eSqW=(aW*aW-bW*bW)/(aW*aW);
+  const p=Math.sqrt(x2*x2+y2*y2);
+  let phi=Math.atan2(z2,p*(1-eSqW)), phiP=2*Math.PI;
+  while(Math.abs(phi-phiP)>1e-11){
+    const nuW=aW/Math.sqrt(1-eSqW*Math.sin(phi)*Math.sin(phi));
+    phiP=phi;
+    phi=Math.atan2(z2+eSqW*nuW*Math.sin(phi),p);
   }
-  if(_map){ _map.remove(); _map = null; }
-  _map = L.map(el, { zoomControl:true, attributionControl:true });
+  const lam=Math.atan2(y2,x2);
+  return [phi*180/Math.PI, lam*180/Math.PI];
+}
+// Best coordinates for the resolved property: convert the selected address's National
+// Grid easting/northing; fall back to a default (central Bristol) if unavailable.
+function mapCoords(){
+  const d = realData && realData.address && realData.address.data && realData.address.data[0];
+  if(d && d.xCoordinate!=null && d.yCoordinate!=null){
+    const ll = osgbToLatLon(+d.xCoordinate, +d.yCoordinate);
+    if(ll && isFinite(ll[0]) && isFinite(ll[1])) return ll;
+  }
+  return [51.4712, -2.6003];
+}
+let _map = null;     // the single Leaflet instance
+let _mapNode = null; // the live <div> it's bound to (migrates between views)
+let _marker = null;
+function initMap(){
+  if(!window.L) return;
+  // A map slot lives in whichever view is on screen (the agent-flows enter node and
+  // the passport view each render one). Pick the placeholder that's actually visible
+  // — display:none copies have a null offsetParent.
+  const slot = [...document.querySelectorAll('.mapslot')].find(s => s.offsetParent !== null);
+  if(!slot) return;
+  const [lat, lng] = mapCoords();
+
+  // Already built: a re-render or view switch leaves a fresh EMPTY placeholder where
+  // the map should be. Migrate the one live map node into it (no teardown, no tile
+  // reload, no flicker), then recalc size + recenter.
+  if(_map && _mapNode){
+    if(slot !== _mapNode) slot.replaceWith(_mapNode);
+    if(_marker) _marker.setLatLng([lat, lng]);
+    _map.setView([lat, lng], _map.getZoom() || 16);
+    requestAnimationFrame(()=>{ try{ _map.invalidateSize(); }catch(e){} });
+    return;
+  }
+
+  // First build: initialise on the visible slot and remember its node.
+  _mapNode = slot;
+  _map = L.map(slot, { zoomControl:true, attributionControl:true });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     maxZoom:19
@@ -649,8 +714,12 @@ function initMap(){
     iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
     shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
   });
-  L.marker([lat, lng]).addTo(_map);
+  _marker = L.marker([lat, lng]).addTo(_map);
   _map.setView([lat, lng], 16);
+  // Leaflet measures the container at creation; if layout wasn't final it paints grey
+  // tiles. Recalc on the next frame and once more after tiles settle.
+  requestAnimationFrame(()=>{ try{ _map.invalidateSize(); }catch(e){} });
+  setTimeout(()=>{ try{ _map.invalidateSize(); }catch(e){} }, 300);
 }
 
 function setView(v){
@@ -659,8 +728,10 @@ function setView(v){
   document.getElementById('flowsView')?.classList.toggle('active',v==='flows');
   document.getElementById('passportView')?.classList.toggle('active',v==='passport');
   document.getElementById('payloadsView')?.classList.toggle('active',v==='payloads');
-  if(v==='passport'){ renderPassport(); initMap(); }
+  if(v==='passport') renderPassport();
   if(v==='payloads') renderPayloads();
+  if(v==='flows') renderFlow();
+  initMap();
   persist();
 }
 
@@ -690,6 +761,10 @@ function searchAddress(){
           realData.addressResults = r.data;
           renderFlow();
         }
+      } else {
+        // No BFF reachable (offline demo / static serve) — resolve to a synthetic
+        // address so the search still completes and the UPRN chip renders.
+        selectAddress({ uprn: resolvedUprn(), address: q });
       }
     });
 }
