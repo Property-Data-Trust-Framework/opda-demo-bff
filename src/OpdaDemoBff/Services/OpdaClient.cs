@@ -72,6 +72,7 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
     public async Task<JsonElement?> GetAsync(string path, CancellationToken ct = default)
     {
         var token = await GetTokenAsync(ct);
+        if (token is null) return null;
         using var req = new HttpRequestMessage(HttpMethod.Get, path);
         req.Headers.Authorization = new("Bearer", token);
         var res = await _apiClient.SendAsync(req, ct);
@@ -83,6 +84,7 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
     public async Task<JsonElement?> PostAsync(string path, object body, CancellationToken ct = default)
     {
         var token = await GetTokenAsync(ct);
+        if (token is null) return null;
         using var req = new HttpRequestMessage(HttpMethod.Post, path);
         req.Headers.Authorization = new("Bearer", token);
         req.Content = JsonContent.Create(body);
@@ -95,6 +97,7 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
     public async Task<(JsonElement? Body, string? JwsSignature)> GetWithJwsAsync(string path, CancellationToken ct = default)
     {
         var token = await GetTokenAsync(ct);
+        if (token is null) return (null, null);
         using var req = new HttpRequestMessage(HttpMethod.Get, path);
         req.Headers.Authorization = new("Bearer", token);
         var res = await _apiClient.SendAsync(req, ct);
@@ -107,6 +110,7 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
     public async Task<(JsonElement? Body, string? JwsSignature)> PostWithJwsAsync(string path, object body, CancellationToken ct = default)
     {
         var token = await GetTokenAsync(ct);
+        if (token is null) return (null, null);
         using var req = new HttpRequestMessage(HttpMethod.Post, path);
         req.Headers.Authorization = new("Bearer", token);
         req.Content = JsonContent.Create(body);
@@ -120,6 +124,7 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
     public async Task<JsonElement?> PostFormAsync(string path, IEnumerable<KeyValuePair<string, string>> fields, CancellationToken ct = default)
     {
         var token = await GetTokenAsync(ct);
+        if (token is null) return null;
         using var req = new HttpRequestMessage(HttpMethod.Post, path);
         req.Headers.Authorization = new("Bearer", token);
         req.Content = new FormUrlEncodedContent(fields);
@@ -131,7 +136,7 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
 
     // ── token acquisition ─────────────────────────────────────────────────────
 
-    private async Task<string> GetTokenAsync(CancellationToken ct)
+    private async Task<string?> GetTokenAsync(CancellationToken ct)
     {
         if (_cachedToken != null && DateTimeOffset.UtcNow < _tokenExpiry.AddMinutes(-1))
             return _cachedToken;
@@ -152,11 +157,11 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
             ]);
 
             var res = await _tokenClient.PostAsync(_tokenEndpoint, form, ct);
-            res.EnsureSuccessStatusCode();
+            if (!res.IsSuccessStatusCode) return null;
 
             var json = await res.Content.ReadFromJsonAsync<JsonElement>(ct);
-            _cachedToken = json.GetProperty("access_token").GetString()
-                ?? throw new InvalidOperationException("Token response missing access_token");
+            _cachedToken = json.GetProperty("access_token").GetString();
+            if (_cachedToken is null) return null;
             var expiresIn = json.TryGetProperty("expires_in", out var exp) ? exp.GetInt32() : 300;
             _tokenExpiry = DateTimeOffset.UtcNow.AddSeconds(expiresIn);
 

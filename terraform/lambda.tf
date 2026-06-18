@@ -22,7 +22,7 @@ resource "aws_lambda_function" "app" {
       OPDA_TOKEN_ENDPOINT    = "https://matls-auth.directory.pdtf.raidiam.io/token"
       OPDA_SCOPE             = "land-registry"
       VMC_BASE_URL            = var.vmc_base_url
-      VMC_SCOPE               = "transaction-status"
+      VMC_SCOPE               = "land-registry"
       PDI_BASE_URL            = var.pdi_base_url
       PDI_SCOPE               = "property-pack"
       SPRIFT_BASE_URL         = var.sprift_base_url
