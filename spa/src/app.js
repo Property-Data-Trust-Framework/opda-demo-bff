@@ -42,17 +42,51 @@ function fmtTime(iso) {
 }
 async function pollBffEvents() {
   try {
-    const res = await fetch('/demo-api/events?limit=20');
+    if (!state.transactionDid) return;
+    const res = await fetch('/demo-api/events/' + encodeURIComponent(state.transactionDid));
     if (!res.ok) return;
     const events = await res.json();
     bffEvents = events.map(e => {
       const payload = decodeJwtPayload(e.rawBody);
-      const label = payload && payload.eventType ? payload.eventType : 'webhook.received';
+      const label = payload && payload.event ? payload.event : 'webhook.received';
       return [fmtTime(e.receivedAt), label, 'Smoove'];
     });
-    // refresh the stream panel for conveyancers without a full re-render
-    if (state.role === 'sconv' || state.role === 'bconv') renderNodes(state.role);
+    // Map incoming Smoove event names to flow state (idempotent — guard prevents double-fire)
+    const EVENT_MAP = {
+      'completion_set':      'completion_set',
+      'completion_actioned': 'completion_actioned',
+      'tid':                 'tid_received',
+    };
+    let changed = false;
+    for(const e of events){
+      const payload = decodeJwtPayload(e.rawBody);
+      const id = payload?.event && EVENT_MAP[payload.event];
+      if(id && !eventFired(id)){
+        const t = fmtTime(e.receivedAt);
+        const entry = {time:t};
+        if(payload.event==='tid' && payload.data?.tid) entry.tid=payload.data.tid;
+        state.fired[id]=entry; state.lastKey=t+'|'+payload.event; changed=true;
+      }
+    }
+    if(changed) sync();
+    else if(state.role==='sconv'||state.role==='bconv') renderNodes(state.role);
   } catch {}
+}
+
+// Fire a conveyancing event: triggers the real Smoove simulate endpoint (fire-and-forget)
+// then advances local state immediately so the UI responds without waiting for the poll.
+async function fireConveyEvent(id){
+  const CONVEY_PATHS = {
+    completion_set:      '/demo-api/conveyancing/completion-set',
+    completion_actioned: '/demo-api/conveyancing/completion-actioned',
+  };
+  const path = CONVEY_PATHS[id];
+  if(path) bffFetch(path, {
+    method:  'POST',
+    headers: {'Content-Type': 'application/json'},
+    body:    JSON.stringify({transactionDid: state.transactionDid}),
+  });
+  fireEvent(id);
 }
 
 /* ---------- lookups + tiny helpers ---------- */
@@ -115,13 +149,13 @@ function cascade(){
           const node=nodeById(f.role,f.id); if(node.effect) node.effect();
           // Trigger real BFF calls for auto nodes that have API counterparts
           if(f.role==='agent'&&f.id==='uprn'){
-            bffFetch(`/demo-api/uprn/${resolvedUprn()}`).then(r=>{ if(r){ realData.uprn=r; renderFlow(); initMap(); } });
+            bffFetch(`/demo-api/uprn/${resolvedUprn()}`).then(r=>{ if(r){ realData.uprn=r; renderFlow(); initMap(); if(state.view==='payloads') renderPayloads(); } });
           }
           if(f.role==='agent'&&f.id==='pack'){
-            bffFetch(`/demo-api/pack/${resolvedUprn()}`).then(r=>{ if(r){ realData.pack=r; renderFlow(); } });
+            bffFetch(`/demo-api/pack/${resolvedUprn()}`).then(r=>{ if(r){ realData.pack=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='passport') renderPassport(); } });
           }
           if(f.role==='seller'&&f.id==='packSourced'){
-            bffFetch(`/demo-api/property-pack/${resolvedUprn()}`).then(r=>{ if(r){ realData.sellerPack=r; renderFlow(); } });
+            bffFetch(`/demo-api/property-pack/${resolvedUprn()}`).then(r=>{ if(r){ realData.sellerPack=r; renderFlow(); if(state.view==='payloads') renderPayloads(); } });
           }
           persist(); render(); cascade();
         }, 760);
@@ -459,23 +493,79 @@ function pgrid(specs){
   }).join('');
 }
 function renderPassport(){
+  const host = document.getElementById('passportView');
+  if(!state.addr?.uprn){
+    host.innerHTML=`<div class="plempty">${svg('eye',1.6)}<div><h2>No property resolved</h2><p>Resolve a property in the Estate Agent flow to open the Property Passport.</p><button class="btn amber" data-jump="agent">${svg('arrow')} Go to the Estate Agent</button></div></div>`;
+    return;
+  }
+  const pack = typeof realData!=='undefined' && realData.pack;
+
+  // EPC — potentialEnergyRating may not be in the API response; band is confirmed
+  const epcBand      = pack?.epc?.data?.currentEnergyEfficiencyBand ?? 'C';
+  const epcPotential = pack?.epc?.data?.potentialEnergyRating ?? 'B';
+
+  // Council tax
+  const ctBand = pack?.councilTax?.data?.councilTaxBand ?? 'D';
+
+  // Coalfield
+  const coalRaw    = pack?.coalfield?.data?.coalfieldStatus;
+  const coalStatus = coalRaw==='ON_COALFIELD'?'ON':coalRaw==='OFF_COALFIELD'?'OFF':(coalRaw??'—');
+  const coalSeal   = coalRaw==='ON_COALFIELD'?'warn':'ok';
+  const coalSub    = coalRaw==='ON_COALFIELD'?'risk area':'low risk';
+
+  // Title register
+  const isLeasehold = pack?.titleRegister?.data?.OCSummaryData?.RegisterEntryIndicators?.LeaseHoldTitleIndicator;
+  const tenure      = isLeasehold ? 'Leasehold' : 'Freehold';
+  const titleNum    = pack?.titleRegister?.data?.OCSummaryData?.Title?.TitleNumber ?? 'EXC10010';
+
+  // Source of funds
+  const sofDone = !!state.sof;
+
+  // Surveys
+  const survDone = !!(state.surv && (state.surv.sconv || state.surv.bconv));
+  const fmtBytes = b => b>1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB';
+  const rawDocs  = typeof realData!=='undefined' && (realData.surveys?.documents ?? realData.surveys?.data?.documents);
+  const survItems = rawDocs && rawDocs.length
+    ? rawDocs.map(d=>({name:d.name||d.fileName||'Document', meta:d.size?fmtBytes(d.size)+' · pre-signed S3':'pre-signed S3', seal:'ok'}))
+    : [{name:'RICS Level 2 Survey.pdf',meta:'2.4 MB · pre-signed S3',seal:'ok'},
+       {name:'Floor plan.pdf',meta:'480 KB · pre-signed S3',seal:'ok'}];
+
+  // Identity & AML
+  const buyerIdDone = !!(state.id && state.id.buyer);
+  const amlDone     = flagDone('bconv.aml');
+  const amlAllDone  = buyerIdDone && sofDone && amlDone;
+  const amlLines    = [
+    buyerIdDone ? 'Buyer identity verified'   : 'Buyer identity — pending',
+    sofDone     ? 'Source of funds traced'     : 'Source of funds — pending',
+    amlDone     ? 'AML screening clear'        : 'AML screening — pending',
+  ];
+
   const cards = [
-    {type:'kpis',title:'Council tax',span:3,payloadId:'council_tax',items:[{label:'Band',value:'D',seal:'warn'}]},
-    {type:'epc',title:'Energy — EPC',span:3,payloadId:'epc',band:'C',value:'C · 72',potential:'B',seal:'ok',provLabel:'signed'},
-    {type:'kpis',title:'Mining / coalfield',span:3,payloadId:'coalfield',items:[{label:'Status',value:'OFF',seal:'ok',sub:'low risk'}]},
-    {type:'kpis',title:'Source of funds',span:3,payloadId:'source_of_funds',items:[{label:'Status',value:'Verified',small:true,seal:'ok',sub:'deposit traced'}]}
+    {type:'kpis',title:'Council tax',span:3,payloadId:'council_tax',
+      items:[{label:'Band',value:ctBand,seal:'warn'}]},
+    {type:'epc',title:'Energy — EPC',span:3,payloadId:'epc',
+      band:epcBand,value:epcBand,potential:epcPotential,seal:'ok',provLabel:'signed'},
+    {type:'kpis',title:'Mining / coalfield',span:3,payloadId:'coalfield',
+      items:[{label:'Status',value:coalStatus,seal:coalSeal,sub:coalSub}]},
+    {type:'kpis',title:'Source of funds',span:3,payloadId:'source_of_funds',
+      items:[{label:'Status',value:sofDone?'Verified':'Pending',small:true,
+              seal:sofDone?'ok':'warn',sub:sofDone?'deposit traced':'not yet traced'}]}
   ];
   const wide = [
     {type:'kpis',title:'Title register &amp; ownership',span:8,cols:3,seal:'ok',provLabel:'signed HMLR',payloadId:'title_register',
-      items:[{label:'Tenure',value:'Freehold',small:true},{label:'Title number',value:'ABC12345',small:true},{label:'Price paid',value:'£xxx,xxx',small:true}]},
+      items:[{label:'Tenure',value:tenure,small:true},{label:'Title number',value:titleNum,small:true},{label:'Price paid',value:'£xxx,xxx',small:true}]},
     {type:'map',title:'Location',span:4,payloadId:'address'}
   ];
-  const docs = [{type:'docs',title:'Survey documents',span:6,seal:'ok',provLabel:'signed S3',payloadId:'surveys',
-    items:[{name:'RICS Level 2 survey.pdf',meta:'2.4 MB · pre-signed S3',seal:'ok'},{name:'Floor plan.pdf',meta:'480 KB · pre-signed S3',seal:'ok'}]},
-    {type:'status',tone:'ok',title:'Identity &amp; AML',span:6,seal:'ok',provLabel:'signed',
-      lines:['Buyer identity verified','Source of funds traced','AML screening clear']}];
+  const docs = [
+    survDone
+      ? {type:'docs',title:'Survey documents',span:6,seal:'ok',provLabel:'signed S3',payloadId:'surveys',items:survItems}
+      : {type:'status',tone:'warn',title:'Survey documents',span:6,
+         lines:['Not yet retrieved — pull surveys in the Seller or Buyer Conveyancer flow']},
+    {type:'status',tone:amlAllDone?'ok':'warn',title:'Identity &amp; AML',span:6,
+      seal:amlAllDone?'ok':'warn',provLabel:amlAllDone?'signed':undefined,lines:amlLines}
+  ];
 
-  document.getElementById('passportView').innerHTML = `
+  host.innerHTML = `
     <div class="persona" style="margin-bottom:22px;">
       <div class="avatar">${svg('home',1.7)}</div>
       <div class="ptxt">
@@ -496,7 +586,7 @@ function renderPassport(){
    ============================================================ */
 function payloadRetrieved(gate){
   switch(gate){
-    case 'addr':       return !!state.addr;
+    case 'addr':       return !!(realData.address?.data?.[0]);
     case 'pack':       return flagDone('agent.pack');
     case 'sof':        return !!state.sof;
     case 'surv':       return !!(state.surv && (state.surv.sconv||state.surv.bconv));
@@ -531,6 +621,20 @@ function resolvedSig(s){
   }
   return s.sig;
 }
+function resolvedClaims(s){
+  const uprn = resolvedUprn();
+  // Merge order: static fallback → real UPRN (overrides static UPRN_ID) → live API data (wins if it carries its own uprn)
+  if(s.id==='address'){ const d=realData.address?.data?.[0]; if(d) return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='epc'){ const d=realData.pack?.epc?.data; if(d) return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='council_tax'){ const d=realData.pack?.councilTax?.data; if(d) return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='coalfield'){ const d=realData.pack?.coalfield?.data; if(d) return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='title_register'){ const d=realData.pack?.titleRegister?.data; if(d) return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='chain'){ const d=realData.chain?.data?.data?.[0]; if(d) return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='source_of_funds'){ if(realData.sof) return Object.assign({},s.claims,{uprn},realData.sof); }
+  if(s.id==='surveys'){ if(realData.surveys) return Object.assign({},s.claims,{uprn},realData.surveys); }
+  if(s.id==='property_pack'){ const d=realData.sellerPack?.data; if(d&&typeof d==='object') return Object.assign({},s.claims,{uprn},d); }
+  return Object.assign({}, s.claims, {uprn});
+}
 function jsonHighlight(obj){
   const json = JSON.stringify(obj, null, 2)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -562,7 +666,7 @@ function payloadCard(s){
          <div class="plsigrow"><span>signed</span><b>${sig.signedAt}</b></div>
          <div class="plsigval mono">${sig.value||'(pending BFF response)'}</div>`
       : `<div class="plnosig">${s.sig.note}</div>`;
-    body=`<pre class="pljson"><code>${jsonHighlight(s.claims)}</code></pre>
+    body=`<pre class="pljson"><code>${jsonHighlight(resolvedClaims(s))}</code></pre>
       <button class="plsigtoggle ${s.signed?'':'warn'}" data-sigtoggle="${s.id}">${svg('shield',2)} ${s.signed?'JWS signature':'signature status'}<span class="plcaret">▸</span></button>
       <div class="plsig" id="sig-${s.id}" hidden>${sigBlock}</div>`;
   }
@@ -572,13 +676,14 @@ function payloadCard(s){
 }
 function renderPayloads(){
   const host=document.getElementById('payloadsView');
-  if(!state.addr){
+  if(!state.addr?.uprn){
     host.innerHTML=`<div class="plempty">${svg('braces',1.6)}<div><h2>No payloads yet</h2><p>Resolve a property in the Estate Agent flow — its signed source payloads appear here as each one is pulled back.</p><button class="btn amber" data-jump="agent">${svg('arrow')} Go to the Estate Agent</button></div></div>`;
     return;
   }
   const got = PAYLOADS.sources.filter(s=>payloadRetrieved(s.gate));
   const signedCount = got.filter(s=>s.signed).length;
-  const env = Object.assign({}, PAYLOADS.envelope, { sourcesRetrieved: got.length, sourcesSigned: signedCount });
+  const uprn = resolvedUprn();
+  const env = Object.assign({}, PAYLOADS.envelope, { uprn, pack: 'property-pack/'+uprn, sourcesRetrieved: got.length, sourcesSigned: signedCount });
   host.innerHTML = `
     <div class="persona" style="margin-bottom:22px;">
       <div class="avatar">${svg('braces',1.7)}</div>
@@ -744,7 +849,8 @@ function mark(key){ state.lastKey=key; }
 function resetAll(){
   const role=state.role||'agent', view=state.view||'flows';
   state={ role, view, flags:{}, fired:{}, gates:{}, id:{}, surv:{},
-          addr:null, invited:null, published:null, advid:null, sof:null, lastKey:null };
+          addr:null, invited:null, published:null, advid:null, sof:null, lastKey:null,
+          transactionDid: 'did:web:example.com:transaction:' + crypto.randomUUID() };
   firing=null; realData={}; render(); setView(view); persist(); cascade();
 }
 
@@ -777,7 +883,7 @@ function selectAddress(item){
   });
   sync();
   bffFetch(`/demo-api/chain/${item.uprn || '100091225620'}`)
-    .then(cr=>{ if(cr){ realData.chain=cr; renderChain(); } });
+    .then(cr=>{ if(cr){ realData.chain=cr; renderChain(); if(state.view==='payloads') renderPayloads(); } });
 }
 function resetSearch(){ state.addr=null; realData.address=null; realData.addressResults=null; sync(); }
 function inviteSeller(){ if(state.invited) return; state.invited={time:nowHM()}; mark(state.invited.time+'|identity.invite.sent'); sync(); }
@@ -791,13 +897,13 @@ function resetAdvId(){ state.advid=null; sync(); }
 function traceFunds(){
   state.sof={time:nowHM()}; mark(state.sof.time+'|funds.traced'); sync();
   bffFetch('/demo-api/source-of-funds', {method:'POST'})
-    .then(r=>{ if(r){ realData.sof=r; renderFlow(); } });
+    .then(r=>{ if(r){ realData.sof=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='passport') renderPassport(); } });
 }
 function resetFunds(){ state.sof=null; sync(); }
 function retrieveSurveys(role){
   state.surv[role]={time:nowHM()}; mark(state.surv[role].time+'|documents.surveys.retrieved'); sync();
   bffFetch(`/demo-api/surveys/${resolvedUprn()}`)
-    .then(r=>{ if(r){ realData.surveys=r; renderFlow(); } });
+    .then(r=>{ if(r){ realData.surveys=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='passport') renderPassport(); } });
 }
 function requestPack(gate){ const c=state.gates[gate]||{}; if(c.status==='granted') return; state.gates[gate]={status:'requested',reqTime:nowHM(),decTime:null}; mark(state.gates[gate].reqTime+'|consent.requested'); sync(); }
 function decideConsent(gate,ok){ const c=state.gates[gate]||{}; state.gates[gate]={status:ok?'granted':'denied',reqTime:c.reqTime,decTime:nowHM(),by:state.role}; mark(state.gates[gate].decTime+'|seller.consent.'+(ok?'granted':'denied')); sync(); }
@@ -839,7 +945,7 @@ document.body.addEventListener('click',e=>{
   if(e.target.closest('[data-advidreset]')){ resetAdvId(); return; }
   if(e.target.closest('[data-funds]')){ traceFunds(); return; }
   if(e.target.closest('[data-fundsreset]')){ resetFunds(); return; }
-  const fb=e.target.closest('[data-fire]'); if(fb){ fireEvent(fb.dataset.fire); return; }
+  const fb=e.target.closest('[data-fire]'); if(fb){ fireConveyEvent(fb.dataset.fire); return; }
   const er=e.target.closest('[data-eventreset]'); if(er){ resetEvent(er.dataset.eventreset); return; }
   const req=e.target.closest('[data-request]'); if(req){ requestPack(req.dataset.request); return; }
   const dec=e.target.closest('[data-decide]'); if(dec){ decideConsent(dec.dataset.gate, dec.dataset.decide==='yes'); return; }
