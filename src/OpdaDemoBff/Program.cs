@@ -72,6 +72,16 @@ if (!string.IsNullOrEmpty(spriftBaseUrl))
         }).GetAwaiter().GetResult());
 }
 
+// Smoove — API key only, no mTLS. Skipped if SMOOVE_BASE_URL is not set.
+var smooveBaseUrl = Environment.GetEnvironmentVariable("SMOOVE_BASE_URL") ?? "";
+if (!string.IsNullOrEmpty(smooveBaseUrl))
+{
+    builder.Services.AddSingleton<ISmooveClient>(_ =>
+        SmooveClient.CreateAsync(
+            smooveBaseUrl,
+            Environment.GetEnvironmentVariable("SMOOVE_API_KEY_PATH") ?? "").GetAwaiter().GetResult());
+}
+
 var app = builder.Build();
 
 // ── POST /webhook ─────────────────────────────────────────────────────────────
@@ -81,25 +91,30 @@ var app = builder.Build();
 app.MapPost("/webhook", async (HttpRequest request, IWebhookStore store) =>
 {
     using var reader = new StreamReader(request.Body);
-    var rawBody = await reader.ReadToEndAsync();
+    var rawBody = (await reader.ReadToEndAsync()).Trim();
+
+    // Smoove delivers the JWT wrapped as a JSON string literal: "eyJ..."
+    // Unwrap the outer quotes so we store the bare JWT.
+    if (rawBody.StartsWith('"') && rawBody.EndsWith('"'))
+        rawBody = rawBody[1..^1];
 
     if (string.IsNullOrWhiteSpace(rawBody))
         return Results.BadRequest(new { error = "Empty body" });
 
-    var eventId = await store.StoreAsync(rawBody);
-    return Results.Ok(new { eventId, status = "stored" });
+    await store.StoreAsync(rawBody);
+    return Results.Ok(new { status = "stored" });
 });
 
-// ── GET /demo-api/events ──────────────────────────────────────────────────────
+// ── GET /demo-api/events/{transactionDid} ────────────────────────────────────
 
-app.MapGet("/demo-api/events", async (IWebhookStore store, int limit = 50) =>
-    Results.Ok(await store.ListAsync(Math.Min(limit, 100))));
+app.MapGet("/demo-api/events/{transactionDid}", async (string transactionDid, IWebhookStore store) =>
+    Results.Ok(await store.ListAsync(transactionDid)));
 
-// ── GET /demo-api/events/{id} ─────────────────────────────────────────────────
+// ── GET /demo-api/events/{transactionDid}/{event} ────────────────────────────
 
-app.MapGet("/demo-api/events/{eventId}", async (string eventId, IWebhookStore store) =>
+app.MapGet("/demo-api/events/{transactionDid}/{event}", async (string transactionDid, string @event, IWebhookStore store) =>
 {
-    var evt = await store.GetAsync(eventId);
+    var evt = await store.GetAsync(transactionDid, @event);
     return evt is not null ? Results.Ok(evt) : Results.NotFound();
 });
 
@@ -372,6 +387,56 @@ app.MapGet("/demo-api/chain/{uprn}", async (
     return result is not null ? Results.Ok(result) : Results.StatusCode(502);
 });
 
+// ── POST /demo-api/conveyancing/completion-set ────────────────────────────────
+// Triggers Smoove to simulate the completion-date-set event. Smoove fires a
+// signed JWT webhook back to POST /webhook, which stores it in DynamoDB.
+// The SPA polls GET /demo-api/events every 15s and advances the flow on receipt.
+
+app.MapPost("/demo-api/conveyancing/completion-set", async (ConveyRequest req, HttpContext ctx, CancellationToken ct) =>
+{
+    var smoove = ctx.RequestServices.GetService<ISmooveClient>();
+    if (smoove is null) return Results.Problem("Smoove not configured — set SMOOVE_BASE_URL", statusCode: 503);
+    var ok = await smoove.PostAsync("/internal/simulate/completion-set", new
+    {
+        transactionDid = req.TransactionDid,
+        completionDate = DateTimeOffset.UtcNow.AddDays(14).ToString("yyyy-MM-ddTHH:mm:ssZ"),
+    }, ct);
+    return ok ? Results.Ok(new { status = "triggered" }) : Results.StatusCode(502);
+});
+
+// ── POST /demo-api/conveyancing/completion-actioned ───────────────────────────
+// Also auto-triggers the TID simulate call so the TID webhook arrives
+// automatically — mirroring how HMLR issues the TID after completion.
+
+app.MapPost("/demo-api/conveyancing/completion-actioned", async (ConveyRequest req, HttpContext ctx, CancellationToken ct) =>
+{
+    var smoove = ctx.RequestServices.GetService<ISmooveClient>();
+    if (smoove is null) return Results.Problem("Smoove not configured — set SMOOVE_BASE_URL", statusCode: 503);
+    var ok = await smoove.PostAsync("/internal/simulate/completion-actioned", new
+    {
+        transactionDid = req.TransactionDid,
+        completionDate = DateTimeOffset.UtcNow.AddDays(14).ToString("yyyy-MM-ddTHH:mm:ssZ"),
+    }, ct);
+    if (!ok) return Results.StatusCode(502);
+    await smoove.PostAsync("/internal/simulate/tid-received", new
+    {
+        transactionDid = req.TransactionDid,
+        tid = new
+        {
+            titleNumber      = "EXC10010",
+            registrationDate = DateTimeOffset.UtcNow.AddDays(14).ToString("yyyy-MM-dd"),
+            proprietors      = new[] { "Mr Robert Malytix" },
+            tenure           = "freehold",
+            propertyAddress  = "52 Festive Road, London",
+            priceStated      = "£150,000",
+            classOfTitle     = "absolute",
+        },
+    }, ct);
+    return Results.Ok(new { status = "triggered" });
+});
+
 app.Run();
 
 public partial class Program { }
+
+record ConveyRequest(string TransactionDid);

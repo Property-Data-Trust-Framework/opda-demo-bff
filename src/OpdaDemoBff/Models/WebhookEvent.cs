@@ -1,8 +1,9 @@
 namespace OpdaDemoBff.Models;
 
 public record WebhookEvent(
-    string EventId,
+    string TransactionDid,
+    string Event,
     string RawBody,
     string ReceivedAt,
-    long Ttl
+    long   Ttl
 );
