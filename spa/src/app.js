@@ -523,12 +523,12 @@ function renderPassport(){
 
   // Surveys
   const survDone = !!(state.surv && (state.surv.sconv || state.surv.bconv));
-  const fmtBytes = b => b>1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB';
+  const fmtExpiry = iso => { if(!iso) return 'pre-signed S3'; const d=new Date(iso); return 'expires '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); };
   const rawDocs  = typeof realData!=='undefined' && (realData.surveys?.documents ?? realData.surveys?.data?.documents);
   const survItems = rawDocs && rawDocs.length
-    ? rawDocs.map(d=>({name:d.name||d.fileName||'Document', meta:d.size?fmtBytes(d.size)+' · pre-signed S3':'pre-signed S3', seal:'ok'}))
-    : [{name:'RICS Level 2 Survey.pdf',meta:'2.4 MB · pre-signed S3',seal:'ok'},
-       {name:'Floor plan.pdf',meta:'480 KB · pre-signed S3',seal:'ok'}];
+    ? rawDocs.map(d=>({name:d.filename||'Document', meta:fmtExpiry(d.expiresAt), seal:'ok', url:d.url}))
+    : [{name:'RICS Level 2 Survey.pdf',meta:'pre-signed S3',seal:'ok'},
+       {name:'Floor plan.pdf',meta:'pre-signed S3',seal:'ok'}];
 
   // Identity & AML
   const buyerIdDone = !!(state.id && state.id.buyer);
@@ -558,7 +558,8 @@ function renderPassport(){
   ];
   const docs = [
     survDone
-      ? {type:'docs',title:'Survey documents',span:6,seal:'ok',provLabel:'signed S3',payloadId:'surveys',items:survItems}
+      ? {type:'docs',title:'Survey documents',span:6,seal:'ok',provLabel:'signed S3',payloadId:'surveys',items:survItems,
+           action:`<button class="linkbtn" data-survget="${state.role||'sconv'}">${svg('refresh',2)} re-fetch</button>`}
       : {type:'status',tone:'warn',title:'Survey documents',span:6,
          lines:['Not yet retrieved — pull surveys in the Seller or Buyer Conveyancer flow']},
     {type:'status',tone:amlAllDone?'ok':'warn',title:'Identity &amp; AML',span:6,

@@ -91,9 +91,12 @@ const Blocks = {
       <div class="doc">
         <div class="dico">${svg('doc')}</div>
         <div><div class="dn">${d.name}</div><div class="dm">${d.meta}</div></div>
-        <div class="dl">${seal(d.seal,'sm')}<button class="dbtn">${svg('download')}</button></div>
+        <div class="dl">${seal(d.seal,'sm')}${d.url
+          ? `<a href="${d.url}" target="_blank" rel="noopener" class="dbtn">${svg('download')}</a>`
+          : `<button class="dbtn" disabled>${svg('download')}</button>`
+        }</div>
       </div>`).join('');
-    return card(b,rows);
+    return card(b, rows + (b.action ? `<div class="trig-foot">${b.action}</div>` : ''));
   },
   rollup(b){
     const chips = b.items.map(c=>`<span class="chip">${seal(c.seal,'sm')}${c.label}</span>`).join('');
@@ -162,9 +165,12 @@ const Blocks = {
   },
   surveys(b){
     const role=b.role, done=state.surv[role];
-    const docs=`<div class="doc"><div class="dico">${svg('doc')}</div><div><div class="dn">RICS Level 2 Survey.pdf</div><div class="dm">2.4 MB · pre-signed S3</div></div><div class="dl">${seal('ok','sm')}<button class="dbtn">${svg('download')}</button></div></div>
-      <div class="doc"><div class="dico">${svg('doc')}</div><div><div class="dn">Floor plan.pdf</div><div class="dm">480 KB · pre-signed S3</div></div><div class="dl">${seal('ok','sm')}<button class="dbtn">${svg('download')}</button></div></div>
-      <div class="doc"><div class="dico">${svg('doc')}</div><div><div class="dn">Damp &amp; timber report.pdf</div><div class="dm">unsigned</div></div><div class="dl">${seal('warn','sm')}<button class="dbtn">${svg('download')}</button></div></div>`;
+    const fmtExpiry = iso => { if(!iso) return 'pre-signed S3'; const d=new Date(iso); return 'expires '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); };
+    const rawDocs = typeof realData!=='undefined' && (realData.surveys?.documents ?? realData.surveys?.data?.documents);
+    const docs = rawDocs && rawDocs.length
+      ? rawDocs.map(d=>`<div class="doc"><div class="dico">${svg('doc')}</div><div><div class="dn">${d.filename||'Document'}</div><div class="dm">${fmtExpiry(d.expiresAt)}</div></div><div class="dl">${seal('ok','sm')}${d.url?`<a href="${d.url}" target="_blank" rel="noopener" class="dbtn">${svg('download')}</a>`:`<button class="dbtn" disabled>${svg('download')}</button>`}</div></div>`).join('')
+      : `<div class="doc"><div class="dico">${svg('doc')}</div><div><div class="dn">RICS Level 2 Survey.pdf</div><div class="dm">2.4 MB · pre-signed S3</div></div><div class="dl">${seal('ok','sm')}<button class="dbtn">${svg('download')}</button></div></div>
+         <div class="doc"><div class="dico">${svg('doc')}</div><div><div class="dn">Floor plan.pdf</div><div class="dm">480 KB · pre-signed S3</div></div><div class="dl">${seal('ok','sm')}<button class="dbtn">${svg('download')}</button></div></div>`;
     if(done){
       return card(b,`<div class="turnline done">${sealSvg}<span>Surveys retrieved at ${done.time} · <span class="mono">documents.surveys.retrieved</span> streamed</span></div>${docs}<div class="trig-foot"><span class="tf-l">Each survey carries its own provenance seal</span><button class="linkbtn" data-survget="${role}">${svg('refresh',2)} re-fetch</button></div>`);
     }
