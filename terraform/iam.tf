@@ -51,7 +51,7 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
       Action = [
         "dynamodb:PutItem",
         "dynamodb:GetItem",
-        "dynamodb:Scan",
+        "dynamodb:Query",
       ]
       Resource = aws_dynamodb_table.webhook_events.arn
     }]
