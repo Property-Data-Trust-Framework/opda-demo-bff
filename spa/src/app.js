@@ -532,8 +532,7 @@ function renderPassport(){
   const rawDocs  = typeof realData!=='undefined' && (realData.surveys?.documents ?? realData.surveys?.data?.documents);
   const survItems = rawDocs && rawDocs.length
     ? rawDocs.map(d=>({name:d.filename||'Document', meta:fmtExpiry(d.expiresAt), seal:'ok', url:d.url}))
-    : [{name:'RICS Level 2 Survey.pdf',meta:'pre-signed S3',seal:'ok'},
-       {name:'Floor plan.pdf',meta:'pre-signed S3',seal:'ok'}];
+    : [];
 
   // Identity & AML
   const buyerIdDone = !!(state.id && state.id.buyer);
@@ -554,8 +553,11 @@ function renderPassport(){
     {type:'kpis',title:'Mining / coalfield',span:3,payloadId:'coalfield',
       items:[{label:'Status',value:packDone?coalStatus:'—',seal:packDone?coalSeal:undefined,sub:packDone?coalSub:undefined}]},
     {type:'kpis',title:'Survey documents',span:3,payloadId:'surveys',
-      items:[{label:'Status',value:survDone?`${survItems.length} doc${survItems.length===1?'':'s'}`:'Pending',small:true,
-              seal:survDone?'ok':'warn',sub:survDone?'retrieved':'not yet retrieved'}]}
+      items:[{label:'Status',
+              value:survDone?(survItems.length?`${survItems.length} doc${survItems.length===1?'':'s'}`:'Loading…'):'Pending',
+              small:true,
+              seal:survDone?(survItems.length?'ok':'warn'):'warn',
+              sub:survDone?(survItems.length?'retrieved':'awaiting response'):'not yet retrieved'}]}
   ];
   const wide = [
     {type:'kpis',title:'Title register &amp; ownership',span:8,cols:3,

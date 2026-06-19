@@ -163,7 +163,7 @@ const Blocks = {
         <div style="margin-top:13px;"><button class="linkbtn" data-searchreset>${svg('refresh',2)} new search</button></div></div>`);
     }
     return card(b,`<div class="searchwrap"><div class="searchin"><span class="ico">${svg('search',2)}</span><input id="addrInput" placeholder="Search an address or postcode…  e.g. 14 Elm Grove, Bristol BS6"></div><button class="btn" data-search>${svg('search',2)} Search</button></div>
-      <div class="sugg-row">try:<button class="sugg" data-search>14 Elm Grove, Bristol BS6 5DB</button><button class="sugg" data-search>10 Downing Street, London SW1A 2AA</button><button class="sugg" data-search>1 Canada Square, London E14 5AB</button></div>`);
+      <div class="sugg-row">try:<button class="sugg" data-search>33 Evelyn Road, E17 9HE</button><button class="sugg" data-search>5 Cavendish Road, CH45 2NX</button><button class="sugg" data-search>Capel Isaac, SA4 3JQ</button></div>`);
   },
   surveys(b){
     const role=b.role, done=state.surv[role];
@@ -171,8 +171,7 @@ const Blocks = {
     const rawDocs = typeof realData!=='undefined' && (realData.surveys?.documents ?? realData.surveys?.data?.documents);
     const docs = rawDocs && rawDocs.length
       ? rawDocs.map(d=>`<div class="doc"><div class="dico">${svg('doc')}</div><div><div class="dn">${d.filename||'Document'}</div><div class="dm">${fmtExpiry(d.expiresAt)}</div></div><div class="dl">${seal('ok','sm')}${d.url?`<a href="${d.url}" target="_blank" rel="noopener" class="dbtn">${svg('download')}</a>`:`<button class="dbtn" disabled>${svg('download')}</button>`}</div></div>`).join('')
-      : `<div class="doc"><div class="dico">${svg('doc')}</div><div><div class="dn">RICS Level 2 Survey.pdf</div><div class="dm">2.4 MB · pre-signed S3</div></div><div class="dl">${seal('ok','sm')}<button class="dbtn">${svg('download')}</button></div></div>
-         <div class="doc"><div class="dico">${svg('doc')}</div><div><div class="dn">Floor plan.pdf</div><div class="dm">480 KB · pre-signed S3</div></div><div class="dl">${seal('ok','sm')}<button class="dbtn">${svg('download')}</button></div></div>`;
+      : `<div class="doc"><div class="dico">${svg('clock')}</div><div><div class="dn">Retrieving documents…</div><div class="dm">loading</div></div></div>`;
     if(done){
       return card(b,`<div class="turnline done">${sealSvg}<span>Surveys retrieved at ${done.time} · <span class="mono">documents.surveys.retrieved</span> streamed</span></div>${docs}<div class="trig-foot"><span class="tf-l">Each survey carries its own provenance seal</span><button class="linkbtn" data-survget="${role}">${svg('refresh',2)} re-fetch</button></div>`);
     }
