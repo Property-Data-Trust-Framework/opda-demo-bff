@@ -156,9 +156,9 @@ app.MapGet("/demo-api/pack/{uprn}", async (
 
     var lrBody = new
     {
-        messageId = Random.Shared.Next(100000, 999999).ToString(),
-        externalReference = "demo-bff",
-        customerReference = "demo-bff",
+        messageId = "170100",
+        externalReference = "extRef0001",
+        customerReference = "custRef0001",
         titleNumber = tn,
         expectedPrice = 10,
         titleKnownOfficialCopy = new

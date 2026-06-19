@@ -96,6 +96,8 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         using var req = new HttpRequestMessage(HttpMethod.Post, path);
         req.Headers.Authorization = new("Bearer", token);
         req.Content = JsonContent.Create(body);
+        var reqBody = System.Text.Json.JsonSerializer.Serialize(body);
+        _log.LogInformation("Outbound {Scope} POST {Path}: {Body}", _scope, path, reqBody);
         var res = await _apiClient.SendAsync(req, ct);
         if (!res.IsSuccessStatusCode)
         {
