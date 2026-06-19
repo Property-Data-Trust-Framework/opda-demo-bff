@@ -4,7 +4,7 @@
    dependency graph (nodes + branches). Loaded before app.js.
    ============================================================ */
 
-const VERSION = '1.6';
+const VERSION = '1.7';
 
 /* ---------- icon set (inline SVG, 24-grid, stroke) ---------- */
 const I = {
@@ -303,6 +303,10 @@ function setBody(){
   if(eventFired('completion_set')) return doneCard({title:'Completion date set',
     lines:[`Locked at <b style="color:var(--ink)">${state.fired.completion_set.time}</b> · <code>completion.date.set</code> streamed`,'The Buyer Conveyancer can now action completion'],
     jump:jumpBtn('bconv','See the Buyer Conveyancer'), reset:'data-eventreset="completion_set"', resetLabel:'reset'});
+  if(state.conveyPending?.completion_set) return actionCard({icon:'clock', amber:true, title:'Waiting for Smoove webhook…',
+    sub:'Signed event dispatched — the step will advance automatically when the webhook confirms.',
+    body:'<div class="mono epline">POST /conveyancing-events/completion-set</div>',
+    btn:'Waiting…', btnCls:'pen', bIcon:'clock', attr:'disabled'});
   return actionCard({icon:'cal', amber:true, title:'Set the agreed completion date',
     sub:'Locks the completion date into the transaction as a signed conveyancing event.', body:'<div class="mono epline">POST /conveyancing-events/completion-set</div>',
     btn:'Set completion date', btnCls:'pen', bIcon:'cal', attr:'data-fire="completion_set"'});
@@ -311,6 +315,10 @@ function actionBody(){
   if(eventFired('completion_actioned')) return doneCard({title:'Completion actioned — funds released',
     lines:[`Confirmed at <b style="color:var(--ink)">${state.fired.completion_actioned.time}</b> · <code>completion.actioned</code> streamed`,"The Seller Conveyancer's completion merges closed; the TID auto-registers next"],
     jump:jumpBtn('sconv','Back to the Seller Conveyancer'), reset:'data-eventreset="completion_actioned"', resetLabel:'reset'});
+  if(state.conveyPending?.completion_actioned) return actionCard({icon:'clock', amber:true, title:'Waiting for Smoove webhook…',
+    sub:'Signed event dispatched — the step will advance automatically when the webhook confirms.',
+    body:'<div class="mono epline">POST /conveyancing-events/completion-actioned</div>',
+    btn:'Waiting…', btnCls:'pen', bIcon:'clock', attr:'disabled'});
   return actionCard({icon:'shield', amber:true, title:'Action completion',
     sub:'Confirms funds have moved and executes the deal — the matching event for the date the Seller Conveyancer set.', body:'<div class="mono epline">POST /conveyancing-events/completion-actioned</div>',
     btn:'Action completion', btnCls:'pen', bIcon:'shield', attr:'data-fire="completion_actioned"'});

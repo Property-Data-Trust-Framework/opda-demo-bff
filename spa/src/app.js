@@ -65,7 +65,8 @@ async function pollBffEvents() {
         const t = fmtTime(e.receivedAt);
         const entry = {time:t};
         if(payload.event==='tid' && payload.data?.tid) entry.tid=payload.data.tid;
-        state.fired[id]=entry; state.lastKey=t+'|'+payload.event; changed=true;
+        state.fired[id]=entry; state.lastKey=t+'|'+payload.event;
+        delete state.conveyPending[id]; changed=true;
       }
     }
     if(changed) sync();
@@ -73,20 +74,22 @@ async function pollBffEvents() {
   } catch {}
 }
 
-// Fire a conveyancing event: triggers the real Smoove simulate endpoint (fire-and-forget)
-// then advances local state immediately so the UI responds without waiting for the poll.
+// Fire a conveyancing event: triggers the real Smoove simulate endpoint then waits for
+// the webhook to confirm — the flow step only goes green when pollBffEvents picks it up.
 async function fireConveyEvent(id){
   const CONVEY_PATHS = {
     completion_set:      '/demo-api/conveyancing/completion-set',
     completion_actioned: '/demo-api/conveyancing/completion-actioned',
   };
   const path = CONVEY_PATHS[id];
-  if(path) bffFetch(path, {
+  if(!path) return;
+  state.conveyPending[id] = true;
+  sync();
+  bffFetch(path, {
     method:  'POST',
     headers: {'Content-Type': 'application/json'},
     body:    JSON.stringify({transactionDid: state.transactionDid}),
   });
-  fireEvent(id);
 }
 
 /* ---------- lookups + tiny helpers ---------- */
@@ -1016,12 +1019,12 @@ document.body.addEventListener('click',e=>{
    INIT
    ============================================================ */
 try{ const s=JSON.parse(localStorage.getItem('opda-state')); if(s&&s.role&&roleObj(s.role)){ state=Object.assign(state,s); } }catch(e){}
-state.flags=state.flags||{}; state.id=state.id||{}; state.surv=state.surv||{}; state.gates=state.gates||{}; state.fired=state.fired||{}; state.packCleared=state.packCleared||{};
+state.flags=state.flags||{}; state.id=state.id||{}; state.surv=state.surv||{}; state.gates=state.gates||{}; state.fired=state.fired||{}; state.packCleared=state.packCleared||{}; state.conveyPending=state.conveyPending||{};
 renderRail();
 renderFlow();
 setView(state.view||'flows');
 cascade();
 pollBffEvents();
-setInterval(pollBffEvents, 15000);
+setInterval(pollBffEvents, 5000);
 // Populate header version tag; provenance count is driven by updateProvCount() on every renderFlow()
 (()=>{ const vt=document.getElementById('verTag'); if(vt) vt.textContent='v'+VERSION; })();
