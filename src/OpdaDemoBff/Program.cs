@@ -154,11 +154,12 @@ app.MapGet("/demo-api/pack/{uprn}", async (
     var paddedUprn = PadUprn(uprn);
     var tn = string.IsNullOrEmpty(titleNumber) ? "EXC10010" : titleNumber;
 
+    var msgId = Random.Shared.Next(100000, 999999);
     var lrBody = new
     {
-        messageId = "170100",
-        externalReference = "extRef0001",
-        customerReference = "custRef0001",
+        messageId = msgId.ToString(),
+        externalReference = $"ext-{msgId}",
+        customerReference = $"cust-{paddedUprn}",
         titleNumber = tn,
         expectedPrice = 10,
         titleKnownOfficialCopy = new
