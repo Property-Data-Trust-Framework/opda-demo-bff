@@ -379,17 +379,20 @@ function vmcStatus(){
 function chainLinks(){
   const [st,ok]=chainStatus();
   const vmcSt=vmcStatus();
+  const _a = state.addr?.address || 'This property';
+  const ourAddr = _a.length > 30 ? _a.slice(0, 29) + '…' : _a;
   const chain=typeof realData!=='undefined'&&realData.chain?.data?.data?.[0];
   if(chain&&chain.properties&&chain.properties.length){
     return chain.properties.map(p=>{
       const isOurs=p.uprn===resolvedUprn();
-      return {name:p.address||p.displayAddress||'Property',sub:isOurs?'this sale':'',
+      const name=p.address||p.displayAddress||(isOurs?ourAddr:'Property');
+      return {name,sub:isOurs?'this sale':'',
               stat:isOurs?(vmcSt?vmcSt[0]:st):'',tone:isOurs?(vmcSt?vmcSt[1]:ok):'',ours:isOurs};
     });
   }
   return [
     {name:'First-time buyer',sub:'no chain below',stat:'ready',tone:'ok'},
-    {name:'14 Elm Grove',sub:'this sale',stat:vmcSt?vmcSt[0]:st,tone:vmcSt?vmcSt[1]:ok,ours:true},
+    {name:ourAddr,sub:'this sale',stat:vmcSt?vmcSt[0]:st,tone:vmcSt?vmcSt[1]:ok,ours:true},
     {name:'Onward purchase',sub:'seller buying on',stat:'offer accepted',tone:''},
     {name:'Top of chain',sub:'vacant possession',stat:'no onward',tone:'ok'},
   ];
@@ -566,6 +569,8 @@ function renderPassport(){
       seal:amlAllDone?'ok':'warn',provLabel:amlAllDone?'signed':undefined,lines:amlLines}
   ];
 
+  const passportSigned = PAYLOADS.sources.filter(s=>s.signed).length;
+  const passportTotal  = PAYLOADS.sources.length;
   host.innerHTML = `
     <div class="persona" style="margin-bottom:22px;">
       <div class="avatar">${svg('home',1.7)}</div>
@@ -574,7 +579,7 @@ function renderPassport(){
         <h1>Property Passport</h1>
         <p>The single property truth every role reads from. Each source wears a provenance seal driven by its signature block — open <b>{ } JSON</b> on any card to inspect the signed payload behind it.</p>
       </div>
-      <div class="pstats"><div class="s"><div class="v ok">6 / 7</div><div class="l">sources signed</div></div><div class="s"><div class="v">8</div><div class="l">APIs</div></div></div>
+      <div class="pstats"><div class="s"><div class="v ok">${passportSigned} / ${passportTotal}</div><div class="l">sources signed</div></div><div class="s"><div class="v">${passportTotal}</div><div class="l">APIs</div></div></div>
     </div>
     <div class="sectlabel">Property facts</div>
     <div class="grid" style="margin-bottom:18px;">${pgrid(cards)}</div>
@@ -589,6 +594,7 @@ function payloadRetrieved(gate){
   switch(gate){
     case 'addr':       return !!(realData.address?.data?.[0]);
     case 'pack':       return flagDone('agent.pack');
+    case 'uprn':       return flagDone('agent.uprn');
     case 'sof':        return !!state.sof;
     case 'surv':       return !!(state.surv && (state.surv.sconv||state.surv.bconv));
     case 'sellerPack': return flagDone('seller.packSourced');
@@ -601,6 +607,7 @@ function gateHint(gate){
   if(gate==='surv')       return 'sconv';
   if(gate==='sellerPack') return 'seller';
   if(gate==='chain')      return 'agent';
+  if(gate==='uprn')       return 'agent';
   return 'agent';
 }
 // Return real sig data from BFF realData when available, else fall back to static model.
@@ -612,6 +619,10 @@ function resolvedSig(s){
   if(s.id==='property_pack'){
     const jws=realData.sellerPack?.jwsSignature;
     if(jws) return { alg:'ES256', kid:'(x-jws-signature)', iss:'Sprift / PDI', signedAt:'(see header)', value:jws };
+  }
+  if(s.id==='uprn_validation'){
+    const p=realData.uprn?.provenance;
+    if(p) return { alg:p.alg, kid:p.kid, iss:'(OPDA)', signedAt:p.signedAt, value:p.signature };
   }
   // For our OPDA API sources, pull provenance from realData.pack when available.
   const packMap={epc:'epc',council_tax:'councilTax',coalfield:'coalfield',title_register:'titleRegister'};
@@ -634,6 +645,7 @@ function resolvedClaims(s){
   if(s.id==='source_of_funds'){ if(realData.sof) return Object.assign({},s.claims,{uprn},realData.sof); }
   if(s.id==='surveys'){ if(realData.surveys) return Object.assign({},s.claims,{uprn},realData.surveys); }
   if(s.id==='property_pack'){ const d=realData.sellerPack?.data; if(d&&typeof d==='object') return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='uprn_validation'){ const d=realData.uprn?.data; if(d) return Object.assign({},s.claims,{uprn},d); }
   return Object.assign({}, s.claims, {uprn});
 }
 function jsonHighlight(obj){
@@ -649,26 +661,30 @@ function jsonHighlight(obj){
 }
 function payloadCard(s){
   const got = payloadRetrieved(s.gate);
-  const sealEl = !got ? `<span class="plseal pend">${svg('clock',2)} not retrieved</span>`
-    : s.signed ? `<span class="plseal ok">${svg('check',2.4)} signed</span>`
-    : `<span class="plseal warn">unsigned</span>`;
-  let body;
+  let body, sealEl;
   if(!got){
+    sealEl = `<span class="plseal pend">${svg('clock',2)} not retrieved</span>`;
     const tab=gateHint(s.gate);
     body=`<div class="plpend">Not yet retrieved — pulled in via the ${roleObj(tab).name} flow. <button class="jumplink" data-jump="${tab}">Go there →</button></div>`;
   } else {
     const sig = resolvedSig(s);
     const isReal = sig !== s.sig;
-    const sigBlock = s.signed
+    sealEl = isReal
+      ? `<span class="plseal ok">${svg('check',2.4)} signed · live</span>`
+      : s.signed
+      ? `<span class="plseal ok">${svg('check',2.4)} signed</span>`
+      : `<span class="plseal warn">unsigned</span>`;
+    const effectivelySigned = isReal || s.signed;
+    const sigBlock = effectivelySigned
       ? `${isReal?'<div style="font-family:var(--mono);font-size:9px;color:var(--ok-2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">✓ live signature from BFF</div>':''}
-         <div class="plsigrow"><span>alg</span><b>${sig.alg}</b></div>
-         <div class="plsigrow"><span>kid</span><b>${sig.kid}</b></div>
-         <div class="plsigrow"><span>iss</span><b>${sig.iss}</b></div>
-         <div class="plsigrow"><span>signed</span><b>${sig.signedAt}</b></div>
+         <div class="plsigrow"><span>alg</span><b>${sig.alg||'—'}</b></div>
+         <div class="plsigrow"><span>kid</span><b>${sig.kid||'—'}</b></div>
+         <div class="plsigrow"><span>iss</span><b>${sig.iss||'—'}</b></div>
+         <div class="plsigrow"><span>signed</span><b>${sig.signedAt||'—'}</b></div>
          <div class="plsigval mono">${sig.value||'(pending BFF response)'}</div>`
-      : `<div class="plnosig">${s.sig.note}</div>`;
+      : `<div class="plnosig">${s.sig.note||'No signature'}</div>`;
     body=`<pre class="pljson"><code>${jsonHighlight(resolvedClaims(s))}</code></pre>
-      <button class="plsigtoggle ${s.signed?'':'warn'}" data-sigtoggle="${s.id}">${svg('shield',2)} ${s.signed?'JWS signature':'signature status'}<span class="plcaret">▸</span></button>
+      <button class="plsigtoggle ${effectivelySigned?'':'warn'}" data-sigtoggle="${s.id}">${svg('shield',2)} ${effectivelySigned?'JWS signature':'signature status'}<span class="plcaret">▸</span></button>
       <div class="plsig" id="sig-${s.id}" hidden>${sigBlock}</div>`;
   }
   return `<div class="card plcard s6 ${got?'':'pl-pend'}" id="pl-${s.id}">
@@ -968,3 +984,9 @@ setView(state.view||'flows');
 cascade();
 pollBffEvents();
 setInterval(pollBffEvents, 15000);
+// Populate header version tag + dynamic provenance count
+(()=>{
+  const vt=document.getElementById('verTag'); if(vt) vt.textContent='v'+VERSION;
+  const pc=document.getElementById('provSumCount');
+  if(pc){ const s=PAYLOADS.sources.filter(x=>x.signed).length; pc.textContent=`${s} / ${PAYLOADS.sources.length} verified`; }
+})();

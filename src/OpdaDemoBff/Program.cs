@@ -14,7 +14,7 @@ builder.Services.Configure<DynamoConfig>(
 builder.Services.AddSingleton<IAmazonDynamoDB>(_ => new AmazonDynamoDBClient());
 builder.Services.AddSingleton<IWebhookStore, DynamoWebhookStore>();
 
-builder.Services.AddSingleton<IOpdaClient>(_ =>
+builder.Services.AddSingleton<IOpdaClient>(sp =>
     OpdaClient.CreateAsync(new OpdaClientConfig
     {
         ApiBaseUrl     = Environment.GetEnvironmentVariable("OPDA_API_BASE_URL") ?? "",
@@ -24,10 +24,10 @@ builder.Services.AddSingleton<IOpdaClient>(_ =>
         ClientId        = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
         TokenEndpoint   = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
         Scope           = Environment.GetEnvironmentVariable("OPDA_SCOPE") ?? "land-registry",
-    }).GetAwaiter().GetResult());
+    }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult());
 
 // ViewMyChain — same mTLS cert + signing key, different base URL and scope.
-builder.Services.AddKeyedSingleton<IOpdaClient>("vmc", (_, _) =>
+builder.Services.AddKeyedSingleton<IOpdaClient>("vmc", (sp, _) =>
     OpdaClient.CreateAsync(new OpdaClientConfig
     {
         ApiBaseUrl     = Environment.GetEnvironmentVariable("VMC_BASE_URL") ?? "",
@@ -37,10 +37,10 @@ builder.Services.AddKeyedSingleton<IOpdaClient>("vmc", (_, _) =>
         ClientId        = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
         TokenEndpoint   = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
         Scope           = Environment.GetEnvironmentVariable("VMC_SCOPE") ?? "transaction-status",
-    }).GetAwaiter().GetResult());
+    }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult());
 
 // Property Deals Insight — same mTLS cert + signing key, scope: property-pack.
-builder.Services.AddKeyedSingleton<IOpdaClient>("pdi", (_, _) =>
+builder.Services.AddKeyedSingleton<IOpdaClient>("pdi", (sp, _) =>
     OpdaClient.CreateAsync(new OpdaClientConfig
     {
         ApiBaseUrl     = Environment.GetEnvironmentVariable("PDI_BASE_URL") ?? "",
@@ -50,14 +50,14 @@ builder.Services.AddKeyedSingleton<IOpdaClient>("pdi", (_, _) =>
         ClientId        = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
         TokenEndpoint   = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
         Scope           = Environment.GetEnvironmentVariable("PDI_SCOPE") ?? "property-pack",
-    }).GetAwaiter().GetResult());
+    }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult());
 
 // Sprift — mTLS + private_key_jwt (PDTF directory, scope: test) + x-api-key header (sandbox only).
 // Skipped if SPRIFT_BASE_URL is not configured.
 var spriftBaseUrl = Environment.GetEnvironmentVariable("SPRIFT_BASE_URL") ?? "";
 if (!string.IsNullOrEmpty(spriftBaseUrl))
 {
-    builder.Services.AddKeyedSingleton<IOpdaClient>("sprift", (_, _) =>
+    builder.Services.AddKeyedSingleton<IOpdaClient>("sprift", (sp, _) =>
         OpdaClient.CreateAsync(new OpdaClientConfig
         {
             ApiBaseUrl      = spriftBaseUrl,
@@ -69,17 +69,18 @@ if (!string.IsNullOrEmpty(spriftBaseUrl))
             Scope            = Environment.GetEnvironmentVariable("SPRIFT_SCOPE") ?? "property-pack",
             ApiKeyPath       = Environment.GetEnvironmentVariable("SPRIFT_API_KEY_PATH"),
             ApiKeyHeaderName = "x-api-key",
-        }).GetAwaiter().GetResult());
+        }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult());
 }
 
 // Smoove — API key only, no mTLS. Skipped if SMOOVE_BASE_URL is not set.
 var smooveBaseUrl = Environment.GetEnvironmentVariable("SMOOVE_BASE_URL") ?? "";
 if (!string.IsNullOrEmpty(smooveBaseUrl))
 {
-    builder.Services.AddSingleton<ISmooveClient>(_ =>
+    builder.Services.AddSingleton<ISmooveClient>(sp =>
         SmooveClient.CreateAsync(
             smooveBaseUrl,
-            Environment.GetEnvironmentVariable("SMOOVE_API_KEY_PATH") ?? "").GetAwaiter().GetResult());
+            Environment.GetEnvironmentVariable("SMOOVE_API_KEY_PATH") ?? "",
+            sp.GetRequiredService<ILogger<SmooveClient>>()).GetAwaiter().GetResult());
 }
 
 var app = builder.Build();
@@ -136,7 +137,7 @@ app.MapGet("/demo-api/address", async (string q, IOpdaClient opda) =>
 
 app.MapGet("/demo-api/uprn/{uprn}", async (string uprn, IOpdaClient opda) =>
 {
-    var result = await opda.GetAsync($"/v1/uprn/validate/{uprn}");
+    var result = await opda.GetAsync($"/v1/uprn/validate/{PadUprn(uprn)}");
     return result is not null ? Results.Ok(result) : Results.StatusCode(502);
 });
 
@@ -150,6 +151,7 @@ app.MapGet("/demo-api/pack/{uprn}", async (
     IOpdaClient opda,
     CancellationToken ct) =>
 {
+    var paddedUprn = PadUprn(uprn);
     var tn = string.IsNullOrEmpty(titleNumber) ? "EXC10010" : titleNumber;
 
     var lrBody = new
@@ -170,9 +172,9 @@ app.MapGet("/demo-api/pack/{uprn}", async (
         }
     };
 
-    var epcTask = opda.GetAsync($"/v1/epc/{uprn}", ct);
-    var ctTask  = opda.GetAsync($"/v1/council-tax/{uprn}", ct);
-    var mraTask = opda.GetAsync($"/v1/coalfield/{uprn}", ct);
+    var epcTask = opda.GetAsync($"/v1/epc/{paddedUprn}", ct);
+    var ctTask  = opda.GetAsync($"/v1/council-tax/{paddedUprn}", ct);
+    var mraTask = opda.GetAsync($"/v1/coalfield/{paddedUprn}", ct);
     var lrTask  = opda.PostAsync("/opda/official-copies/v1/register-extract", lrBody, ct);
 
     await Task.WhenAll(epcTask, ctTask, mraTask, lrTask);
@@ -191,7 +193,7 @@ app.MapGet("/demo-api/pack/{uprn}", async (
 
 app.MapGet("/demo-api/surveys/{uprn}", async (string uprn, IOpdaClient opda) =>
 {
-    var result = await opda.GetAsync($"/v1/documents/{uprn}");
+    var result = await opda.GetAsync($"/v1/documents/{PadUprn(uprn)}");
     return result is not null ? Results.Ok(result) : Results.StatusCode(502);
 });
 
@@ -440,3 +442,7 @@ app.Run();
 public partial class Program { }
 
 record ConveyRequest(string TransactionDid);
+
+// UPRNs from OS Places are raw integers (e.g. 5114578); backing OPDA APIs require
+// exactly 12 digits, zero-padded (e.g. 000005114578).
+static string PadUprn(string uprn) => uprn.PadLeft(12, '0');

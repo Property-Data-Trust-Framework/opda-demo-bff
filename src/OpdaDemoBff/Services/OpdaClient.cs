@@ -6,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using OpdaDemoBff.Config;
 
@@ -19,12 +20,13 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
     private readonly string _clientId;
     private readonly string _tokenEndpoint;
     private readonly string _scope;
+    private readonly ILogger<OpdaClient> _log;
 
     private string? _cachedToken;
     private DateTimeOffset _tokenExpiry = DateTimeOffset.MinValue;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
 
-    public static async Task<OpdaClient> CreateAsync(OpdaClientConfig cfg)
+    public static async Task<OpdaClient> CreateAsync(OpdaClientConfig cfg, ILogger<OpdaClient> log)
     {
         using var ssm = new AmazonSimpleSystemsManagementClient();
 
@@ -55,11 +57,12 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
             signingKey:    rsa,
             clientId:      cfg.ClientId,
             tokenEndpoint: cfg.TokenEndpoint,
-            scope:         cfg.Scope);
+            scope:         cfg.Scope,
+            log:           log);
     }
 
     private OpdaClient(HttpClient apiClient, HttpClient tokenClient, RSA signingKey,
-                       string clientId, string tokenEndpoint, string scope)
+                       string clientId, string tokenEndpoint, string scope, ILogger<OpdaClient> log)
     {
         _apiClient     = apiClient;
         _tokenClient   = tokenClient;
@@ -67,15 +70,18 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         _clientId      = clientId;
         _tokenEndpoint = tokenEndpoint;
         _scope         = scope;
+        _log           = log;
     }
 
     public async Task<JsonElement?> GetAsync(string path, CancellationToken ct = default)
     {
         var token = await GetTokenAsync(ct);
-        if (token is null) return null;
+        if (token is null) { _log.LogError("Token acquisition failed for {Scope} GET {Path}", _scope, path); return null; }
         using var req = new HttpRequestMessage(HttpMethod.Get, path);
         req.Headers.Authorization = new("Bearer", token);
         var res = await _apiClient.SendAsync(req, ct);
+        if (!res.IsSuccessStatusCode)
+            _log.LogError("Upstream {Status} for {Scope} GET {Path}", (int)res.StatusCode, _scope, path);
         return res.IsSuccessStatusCode
             ? await res.Content.ReadFromJsonAsync<JsonElement>(ct)
             : null;
@@ -84,11 +90,13 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
     public async Task<JsonElement?> PostAsync(string path, object body, CancellationToken ct = default)
     {
         var token = await GetTokenAsync(ct);
-        if (token is null) return null;
+        if (token is null) { _log.LogError("Token acquisition failed for {Scope} POST {Path}", _scope, path); return null; }
         using var req = new HttpRequestMessage(HttpMethod.Post, path);
         req.Headers.Authorization = new("Bearer", token);
         req.Content = JsonContent.Create(body);
         var res = await _apiClient.SendAsync(req, ct);
+        if (!res.IsSuccessStatusCode)
+            _log.LogError("Upstream {Status} for {Scope} POST {Path}", (int)res.StatusCode, _scope, path);
         return res.IsSuccessStatusCode
             ? await res.Content.ReadFromJsonAsync<JsonElement>(ct)
             : null;
@@ -157,7 +165,12 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
             ]);
 
             var res = await _tokenClient.PostAsync(_tokenEndpoint, form, ct);
-            if (!res.IsSuccessStatusCode) return null;
+            if (!res.IsSuccessStatusCode)
+            {
+                var detail = await res.Content.ReadAsStringAsync(ct);
+                _log.LogError("Token endpoint {Status} for scope {Scope}: {Body}", (int)res.StatusCode, _scope, detail);
+                return null;
+            }
 
             var json = await res.Content.ReadFromJsonAsync<JsonElement>(ct);
             _cachedToken = json.GetProperty("access_token").GetString();

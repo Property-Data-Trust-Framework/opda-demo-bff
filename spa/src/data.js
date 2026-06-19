@@ -4,6 +4,8 @@
    dependency graph (nodes + branches). Loaded before app.js.
    ============================================================ */
 
+const VERSION = '1.5';
+
 /* ---------- icon set (inline SVG, 24-grid, stroke) ---------- */
 const I = {
   home:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
@@ -507,6 +509,11 @@ const PAYLOADS = {
       claims:{ uprn:UPRN_ID, address:{ line1:'14 Elm Grove', locality:'Redland', town:'Bristol', postcode:'BS6 5DB' },
         classification:'RD04', easting:358205, northing:174894, lat:51.4712, lng:-2.6003, match:'EXACT', confidence:0.98 } },
 
+    { id:'uprn_validation', name:'UPRN validation', service:'UPRN Validator', endpoint:'GET /v1/uprn/validate/'+UPRN_ID,
+      signed:true, gate:'uprn',
+      sig:{ alg:'RS256', kid:'uprn-key-1', iss:'(OPDA)', signedAt:'', value:'' },
+      claims:{ uprn:UPRN_ID, valid:true, classification:'RD04', source:'AddressBase' } },
+
     { id:'epc', name:'Energy Performance (EPC)', service:'EPC Register', endpoint:'GET /v1/property/epc',
       signed:true, gate:'pack',
       sig:{ alg:'ES256', kid:'epc-2024-key-3', iss:'epc.opendatacommunities.org', signedAt:'2026-06-11T09:14:22Z',
@@ -516,8 +523,8 @@ const PAYLOADS = {
         inspectionDate:'2021-07-14', lodgementDate:'2021-07-20', expiryDate:'2031-07-13' } },
 
     { id:'council_tax', name:'Council tax band', service:'VOA', endpoint:'GET /v1/property/council-tax',
-      signed:false, gate:'pack',
-      sig:{ note:'unsigned — the VOA does not yet issue a signature block; value captured manually and flagged for re-verification' },
+      signed:true, gate:'pack',
+      sig:{ alg:'RS256', kid:'council-tax-key-1', iss:'(OPDA)', signedAt:'', value:'' },
       claims:{ uprn:UPRN_ID, band:'D', localAuthority:'Bristol City Council', annualCharge:2304.18, taxYear:'2026-27', source:'VOA' } },
 
     { id:'coalfield', name:'Mining / coalfield', service:'Coal Authority', endpoint:'GET /v1/mining/coalfield',
