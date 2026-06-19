@@ -81,10 +81,12 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         req.Headers.Authorization = new("Bearer", token);
         var res = await _apiClient.SendAsync(req, ct);
         if (!res.IsSuccessStatusCode)
-            _log.LogError("Upstream {Status} for {Scope} GET {Path}", (int)res.StatusCode, _scope, path);
-        return res.IsSuccessStatusCode
-            ? await res.Content.ReadFromJsonAsync<JsonElement>(ct)
-            : null;
+        {
+            var errBody = await res.Content.ReadAsStringAsync(ct);
+            _log.LogError("Upstream {Status} for {Scope} GET {Path}: {Body}", (int)res.StatusCode, _scope, path, errBody);
+            return null;
+        }
+        return await res.Content.ReadFromJsonAsync<JsonElement>(ct);
     }
 
     public async Task<JsonElement?> PostAsync(string path, object body, CancellationToken ct = default)
@@ -96,10 +98,12 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         req.Content = JsonContent.Create(body);
         var res = await _apiClient.SendAsync(req, ct);
         if (!res.IsSuccessStatusCode)
-            _log.LogError("Upstream {Status} for {Scope} POST {Path}", (int)res.StatusCode, _scope, path);
-        return res.IsSuccessStatusCode
-            ? await res.Content.ReadFromJsonAsync<JsonElement>(ct)
-            : null;
+        {
+            var errBody = await res.Content.ReadAsStringAsync(ct);
+            _log.LogError("Upstream {Status} for {Scope} POST {Path}: {Body}", (int)res.StatusCode, _scope, path, errBody);
+            return null;
+        }
+        return await res.Content.ReadFromJsonAsync<JsonElement>(ct);
     }
 
     public async Task<(JsonElement? Body, string? JwsSignature)> GetWithJwsAsync(string path, CancellationToken ct = default)
@@ -109,7 +113,12 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         using var req = new HttpRequestMessage(HttpMethod.Get, path);
         req.Headers.Authorization = new("Bearer", token);
         var res = await _apiClient.SendAsync(req, ct);
-        if (!res.IsSuccessStatusCode) return (null, null);
+        if (!res.IsSuccessStatusCode)
+        {
+            var errBody = await res.Content.ReadAsStringAsync(ct);
+            _log.LogError("Upstream {Status} for {Scope} GET (JWS) {Path}: {Body}", (int)res.StatusCode, _scope, path, errBody);
+            return (null, null);
+        }
         var body = await res.Content.ReadFromJsonAsync<JsonElement>(ct);
         var jws  = res.Headers.TryGetValues("x-jws-signature", out var vals) ? vals.FirstOrDefault() : null;
         return (body, jws);
@@ -123,7 +132,12 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         req.Headers.Authorization = new("Bearer", token);
         req.Content = JsonContent.Create(body);
         var res = await _apiClient.SendAsync(req, ct);
-        if (!res.IsSuccessStatusCode) return (null, null);
+        if (!res.IsSuccessStatusCode)
+        {
+            var errBody = await res.Content.ReadAsStringAsync(ct);
+            _log.LogError("Upstream {Status} for {Scope} POST (JWS) {Path}: {Body}", (int)res.StatusCode, _scope, path, errBody);
+            return (null, null);
+        }
         var json = await res.Content.ReadFromJsonAsync<JsonElement>(ct);
         var jws  = res.Headers.TryGetValues("x-jws-signature", out var vals) ? vals.FirstOrDefault() : null;
         return (json, jws);
