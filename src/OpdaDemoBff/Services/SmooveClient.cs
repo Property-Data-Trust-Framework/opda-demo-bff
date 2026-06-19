@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
@@ -20,8 +19,7 @@ public sealed class SmooveClient : ISmooveClient, IDisposable
             { Name = apiKeyPath, WithDecryption = true });
 
         var http = new HttpClient { BaseAddress = new Uri(baseUrl) };
-        http.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", res.Parameter.Value);
+        http.DefaultRequestHeaders.Add("X-Api-Key", res.Parameter.Value);
         return new SmooveClient(http, log);
     }
 

@@ -43,7 +43,7 @@ function fmtTime(iso) {
 async function pollBffEvents() {
   try {
     if (!state.transactionDid) return;
-    const res = await fetch('/demo-api/events/' + encodeURIComponent(state.transactionDid));
+    const res = await fetch('/demo-api/events/' + state.transactionDid);
     if (!res.ok) return;
     const events = await res.json();
     bffEvents = events.map(e => {
@@ -546,6 +546,7 @@ function renderPassport(){
 
   const cards = [
     {type:'kpis',title:'Council tax',span:3,payloadId:'council_tax',
+      seal:packDone?'ok':undefined,provLabel:packDone?'signed':undefined,
       items:[{label:'Band',value:packDone?ctBand:'—',seal:packDone?'warn':undefined}]},
     {type:'epc',title:'Energy — EPC',span:3,payloadId:'epc',
       band:packDone?epcBand:'—',value:packDone?epcBand:'—',potential:packDone?epcPotential:'—',
@@ -631,7 +632,9 @@ function resolvedSig(s){
   }
   if(s.id==='property_pack'){
     const jws=realData.sellerPack?.jwsSignature;
-    if(jws) return { alg:'ES256', kid:'(x-jws-signature)', iss:'Sprift / PDI', signedAt:'(see header)', value:jws };
+    const src=realData.sellerPack?.source;
+    const iss=src==='sprift'?'Sprift':src==='pdi'?'PDI':'Sprift / PDI';
+    if(jws) return { alg:'ES256', kid:'(x-jws-signature)', iss, signedAt:'(see header)', value:jws };
   }
   if(s.id==='uprn_validation'){
     const p=realData.uprn?.provenance;
