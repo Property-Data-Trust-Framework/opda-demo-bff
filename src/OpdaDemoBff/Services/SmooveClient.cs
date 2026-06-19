@@ -18,7 +18,7 @@ public sealed class SmooveClient : ISmooveClient, IDisposable
         var res = await ssm.GetParameterAsync(new GetParameterRequest
             { Name = apiKeyPath, WithDecryption = true });
 
-        var http = new HttpClient { BaseAddress = new Uri(baseUrl) };
+        var http = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + '/') };
         http.DefaultRequestHeaders.Add("X-Api-Key", res.Parameter.Value);
         return new SmooveClient(http, log);
     }

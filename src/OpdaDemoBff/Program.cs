@@ -398,7 +398,7 @@ app.MapPost("/demo-api/conveyancing/completion-set", async (ConveyRequest req, H
 {
     var smoove = ctx.RequestServices.GetService<ISmooveClient>();
     if (smoove is null) return Results.Problem("Smoove not configured — set SMOOVE_BASE_URL", statusCode: 503);
-    var ok = await smoove.PostAsync("/internal/simulate/completion-set", new
+    var ok = await smoove.PostAsync("internal/simulate/completion-set", new
     {
         transactionDid = req.TransactionDid,
         completionDate = DateTimeOffset.UtcNow.AddDays(14).ToString("yyyy-MM-ddTHH:mm:ssZ"),
@@ -414,13 +414,13 @@ app.MapPost("/demo-api/conveyancing/completion-actioned", async (ConveyRequest r
 {
     var smoove = ctx.RequestServices.GetService<ISmooveClient>();
     if (smoove is null) return Results.Problem("Smoove not configured — set SMOOVE_BASE_URL", statusCode: 503);
-    var ok = await smoove.PostAsync("/internal/simulate/completion-actioned", new
+    var ok = await smoove.PostAsync("internal/simulate/completion-actioned", new
     {
         transactionDid = req.TransactionDid,
         completionDate = DateTimeOffset.UtcNow.AddDays(14).ToString("yyyy-MM-ddTHH:mm:ssZ"),
     }, ct);
     if (!ok) return Results.StatusCode(502);
-    await smoove.PostAsync("/internal/simulate/tid-received", new
+    await smoove.PostAsync("internal/simulate/tid-received", new
     {
         transactionDid = req.TransactionDid,
         tid = new
