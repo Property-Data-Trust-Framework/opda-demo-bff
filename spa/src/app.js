@@ -7,14 +7,16 @@
 
 /* ---------- state ---------- */
 let state = { role:'agent', view:'flows', flags:{}, fired:{}, gates:{}, id:{}, surv:{},
-              addr:null, invited:null, published:null, advid:null, sof:null };
+              addr:null, invited:null, published:null, advid:null, sof:null, conveyPending:{} };
 let firing = null;
 
 // Real data fetched from the BFF — preferred by renderers where available
 let realData = {};
 
 function resolvedUprn(){
-  return (typeof realData!=='undefined' && realData.address?.data?.[0]?.uprn) || '100091225620';
+  return (typeof realData!=='undefined' && realData.address?.data?.[0]?.uprn)
+    || state.addr?.uprn
+    || '100091225620';
 }
 
 async function bffFetch(path, opts) {
@@ -907,7 +909,7 @@ function setRole(id){ state.role=id; render(); persist(); }
 function mark(key){ state.lastKey=key; }
 function resetAll(){
   const role=state.role||'agent', view=state.view||'flows';
-  state={ role, view, flags:{}, fired:{}, gates:{}, id:{}, surv:{},
+  state={ role, view, flags:{}, fired:{}, gates:{}, id:{}, surv:{}, conveyPending:{},
           addr:null, invited:null, published:null, advid:null, sof:null, lastKey:null,
           transactionDid: 'did:web:example.com:transaction:' + crypto.randomUUID() };
   firing=null; realData={}; render(); setView(view); persist(); cascade();
