@@ -495,7 +495,8 @@ h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;}
 .plseal.pend{color:var(--ink-3);background:var(--bg);border:1px solid var(--line-2);}
 
 .pljson{margin:0;background:var(--navy);border-radius:var(--radius-sm);padding:13px 16px;overflow-x:auto;
-  font-family:var(--mono);font-size:12px;line-height:1.55;color:#cfcee0;}
+  font-family:var(--mono);font-size:12px;line-height:1.55;color:#cfcee0;
+  max-height:calc(30 * 12px * 1.55);overflow-y:auto;}
 .pljson code{font-family:inherit;white-space:pre;}
 .jk{color:#f3c980;}    /* keys */
 .js{color:#9fd9b4;}    /* strings */

@@ -563,7 +563,8 @@ function renderPassport(){
       band:packDone?epcBand:'—',value:packDone?epcBand:'—',potential:packDone?epcPotential:'—',
       seal:packDone?'ok':undefined,provLabel:packDone?'signed':undefined},
     {type:'kpis',title:'Mining / coalfield',span:4,payloadId:'coalfield',
-      items:[{label:'Status',value:packDone?coalStatus:'—',seal:packDone?coalSeal:undefined,sub:packDone?coalSub:undefined}]},
+      seal:packDone?coalSeal:undefined,provLabel:packDone?'signed':undefined,
+      items:[{label:'Status',value:packDone?coalStatus:'—',sub:packDone?coalSub:undefined}]},
   ];
   const wide = [
     {type:'kpis',title:'Title register &amp; ownership',span:8,cols:3,
@@ -572,12 +573,12 @@ function renderPassport(){
     {type:'map',title:'Location',span:4,payloadId:'address'}
   ];
   const row3 = [
-    {type:'kpis',title:'Survey documents',span:6,payloadId:'surveys',
-      items:[{label:'Status',
-              value:survDone?(survItems.length?`${survItems.length} doc${survItems.length===1?'':'s'}`:'Loading…'):'Pending',
-              small:true,
-              seal:survDone?(survItems.length?'ok':'warn'):'warn',
-              sub:survDone?(survItems.length?'retrieved':'awaiting response'):'not yet retrieved'}]},
+    survDone && survItems.length
+      ? {type:'docs',title:'Survey documents',span:6,payloadId:'surveys',
+         seal:'ok',provLabel:'signed',items:survItems}
+      : {type:'kpis',title:'Survey documents',span:6,payloadId:'surveys',
+         items:[{label:'Status',value:survDone?'Loading…':'Pending',small:true,
+                 seal:'warn',sub:survDone?'awaiting response':'not yet retrieved'}]},
     sellerPackDone
       ? {type:'status',tone:'ok',title:'Property pack',span:6,seal:'ok',
          provLabel:packSourceLabel?`signed · ${packSourceLabel}`:'signed',payloadId:'property_pack',

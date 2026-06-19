@@ -566,13 +566,6 @@ const PAYLOADS = {
         documents:[ { name:'RICS Level 2 survey.pdf', type:'RICS_L2', size:2516582, sha256:'a3f9c0e2…b71d' },
           { name:'Floor plan.pdf', type:'FLOORPLAN', size:491520, sha256:'7b2188af…0c34' } ] } },
 
-    { id:'source_of_funds', name:'Source of funds', service:'IDV · Open Banking', endpoint:'GET /v1/source-of-funds',
-      signed:true, gate:'sof',
-      sig:{ alg:'ES256', kid:'idv-key-4', iss:'idv-provider.io', signedAt:'2026-06-11T10:02:15Z',
-        value:'MEUCIQC7mB1aWqNf0pV2kZ9rL8Wq3rJZ1cQ4rLl9aYk7mY0v1Ae2==' },
-      claims:{ subject:'buyer', depositAmount:62000, currency:'GBP', evidencedSource:'Savings + gift',
-        traced:true, accountVerified:true, provider:'open-banking' } },
-
     // Detached JWS (x-jws-signature header) — real value populated by the BFF from realData.sellerPack.jwsSignature
     { id:'property_pack', name:'Property pack', service:'Sprift / PDI', endpoint:'POST /property-pack/uprn',
       signed:true, gate:'sellerPack',
@@ -584,6 +577,13 @@ const PAYLOADS = {
       sig:{ alg:'ES256', kid:'hmlr-key-7', iss:'hmlandregistry.gov.uk', signedAt:'2026-06-11T09:16:48Z',
         value:'MEYCIQDpL3xVbN8Qz9rT4uKpW1cWq3rJZ0kref2bYc9pL0aQ2KdRg==' },
       claims:{ titleNumber:'ABC12345', uprn:UPRN_ID, tenure:'Freehold', classOfTitle:'ABSOLUTE',
-        registeredProprietors:['A. N. Seller'], priorityFrom:'2018-03-02', restrictions:0, charges:1 } }
+        registeredProprietors:['A. N. Seller'], priorityFrom:'2018-03-02', restrictions:0, charges:1 } },
+
+    { id:'source_of_funds', name:'Source of funds', service:'IDV · Open Banking', endpoint:'GET /v1/source-of-funds',
+      signed:true, gate:'sof',
+      sig:{ alg:'ES256', kid:'idv-key-4', iss:'idv-provider.io', signedAt:'2026-06-11T10:02:15Z',
+        value:'MEUCIQC7mB1aWqNf0pV2kZ9rL8Wq3rJZ1cQ4rLl9aYk7mY0v1Ae2==' },
+      claims:{ subject:'buyer', depositAmount:62000, currency:'GBP', evidencedSource:'Savings + gift',
+        traced:true, accountVerified:true, provider:'open-banking' } }
   ]
 };
