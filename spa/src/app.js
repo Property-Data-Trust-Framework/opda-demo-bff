@@ -534,6 +534,11 @@ function renderPassport(){
     ? rawDocs.map(d=>({name:d.filename||'Document', meta:fmtExpiry(d.expiresAt), seal:'ok', url:d.url}))
     : [];
 
+  // Property pack (seller)
+  const sellerPackDone  = payloadRetrieved('sellerPack');
+  const sellerPackSrc   = realData?.sellerPack?.source;
+  const packSourceLabel = sellerPackSrc==='pdi'?'PDI':sellerPackSrc==='sprift'?'Sprift':null;
+
   // Identity & AML
   const buyerIdDone = !!(state.id && state.id.buyer);
   const amlDone     = flagDone('bconv.aml');
@@ -544,27 +549,39 @@ function renderPassport(){
     amlDone     ? 'AML screening clear'        : 'AML screening — pending',
   ];
 
-  const cards = [
-    {type:'kpis',title:'Council tax',span:3,payloadId:'council_tax',
+  const row1 = [
+    {type:'kpis',title:'Council tax',span:4,payloadId:'council_tax',
       seal:packDone?'ok':undefined,provLabel:packDone?'signed':undefined,
       items:[{label:'Band',value:packDone?ctBand:'—',seal:packDone?'warn':undefined}]},
-    {type:'epc',title:'Energy — EPC',span:3,payloadId:'epc',
+    {type:'epc',title:'Energy — EPC',span:4,payloadId:'epc',
       band:packDone?epcBand:'—',value:packDone?epcBand:'—',potential:packDone?epcPotential:'—',
       seal:packDone?'ok':undefined,provLabel:packDone?'signed':undefined},
-    {type:'kpis',title:'Mining / coalfield',span:3,payloadId:'coalfield',
+    {type:'kpis',title:'Mining / coalfield',span:4,payloadId:'coalfield',
       items:[{label:'Status',value:packDone?coalStatus:'—',seal:packDone?coalSeal:undefined,sub:packDone?coalSub:undefined}]},
-    {type:'kpis',title:'Survey documents',span:3,payloadId:'surveys',
-      items:[{label:'Status',
-              value:survDone?(survItems.length?`${survItems.length} doc${survItems.length===1?'':'s'}`:'Loading…'):'Pending',
-              small:true,
-              seal:survDone?(survItems.length?'ok':'warn'):'warn',
-              sub:survDone?(survItems.length?'retrieved':'awaiting response'):'not yet retrieved'}]}
   ];
   const wide = [
     {type:'kpis',title:'Title register &amp; ownership',span:8,cols:3,
       seal:packDone?'ok':undefined,provLabel:packDone?'signed HMLR':undefined,payloadId:'title_register',
       items:[{label:'Tenure',value:packDone?tenure:'—',small:true},{label:'Title number',value:packDone?titleNum:'—',small:true},{label:'Price paid',value:'£xxx,xxx',small:true}]},
     {type:'map',title:'Location',span:4,payloadId:'address'}
+  ];
+  const row3 = [
+    {type:'kpis',title:'Survey documents',span:6,payloadId:'surveys',
+      items:[{label:'Status',
+              value:survDone?(survItems.length?`${survItems.length} doc${survItems.length===1?'':'s'}`:'Loading…'):'Pending',
+              small:true,
+              seal:survDone?(survItems.length?'ok':'warn'):'warn',
+              sub:survDone?(survItems.length?'retrieved':'awaiting response'):'not yet retrieved'}]},
+    sellerPackDone
+      ? {type:'status',tone:'ok',title:'Property pack',span:6,seal:'ok',
+         provLabel:packSourceLabel?`signed · ${packSourceLabel}`:'signed',payloadId:'property_pack',
+         lines:[
+           `Pack sourced via ${packSourceLabel||'partner API'}`,
+           'Detached JWS signature attached',
+           'Consent gate controls buyer access'
+         ]}
+      : {type:'status',tone:'warn',title:'Property pack',span:6,
+         lines:['Not yet sourced — complete the Seller flow to source and seal the property pack']}
   ];
   const docs = [
     sofDone
@@ -589,8 +606,9 @@ function renderPassport(){
       <div class="pstats"><div class="s"><div class="v ok">${passportSigned} / ${passportSignedOf}</div><div class="l">verified</div></div><div class="s"><div class="v">${passportSignedOf}</div><div class="l">APIs</div></div></div>
     </div>
     <div class="sectlabel">Property facts</div>
-    <div class="grid" style="margin-bottom:18px;">${pgrid(cards)}</div>
+    <div class="grid" style="margin-bottom:18px;">${pgrid(row1)}</div>
     <div class="grid" style="margin-bottom:18px;">${pgrid(wide)}</div>
+    <div class="grid" style="margin-bottom:18px;">${pgrid(row3)}</div>
     <div class="grid">${pgrid(docs)}</div>`;
 }
 
