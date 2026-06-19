@@ -156,7 +156,7 @@ app.MapGet("/demo-api/pack/{uprn}", async (
 
     var lrBody = new
     {
-        messageId = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(),
+        messageId = Random.Shared.Next(100000, 999999).ToString(),
         externalReference = "demo-bff",
         customerReference = "demo-bff",
         titleNumber = tn,
