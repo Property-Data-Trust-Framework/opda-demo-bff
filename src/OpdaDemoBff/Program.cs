@@ -439,10 +439,10 @@ app.MapPost("/demo-api/conveyancing/completion-actioned", async (ConveyRequest r
 
 app.Run();
 
-public partial class Program { }
-
-record ConveyRequest(string TransactionDid);
-
 // UPRNs from OS Places are raw integers (e.g. 5114578); backing OPDA APIs require
 // exactly 12 digits, zero-padded (e.g. 000005114578).
 static string PadUprn(string uprn) => uprn.PadLeft(12, '0');
+
+public partial class Program { }
+
+record ConveyRequest(string TransactionDid);
