@@ -4,7 +4,7 @@
    dependency graph (nodes + branches). Loaded before app.js.
    ============================================================ */
 
-const VERSION = '1.5';
+const VERSION = '1.6';
 
 /* ---------- icon set (inline SVG, 24-grid, stroke) ---------- */
 const I = {
@@ -352,17 +352,22 @@ const ROLES = [
       {id:'pack',kind:'auto',ln:'Gather listing info',api:'GET EPC · council-tax · coalfield · title',prereqs:['uprn'],
         fired:()=>{
           const p=typeof realData!=='undefined'&&realData.pack;
+          const cl=state.packCleared||{};
           const epcBand=p?.epc?.data?.currentEnergyEfficiencyBand??'C';
           const ctBand=p?.councilTax?.data?.councilTaxBand??'D';
           const coalfieldRaw=p?.coalfield?.data?.coalfieldStatus;
           const coalStatus=coalfieldRaw==='ON_COALFIELD'?'ON':coalfieldRaw==='OFF_COALFIELD'?'OFF':(coalfieldRaw??'—');
           const isLeasehold=p?.titleRegister?.data?.OCSummaryData?.RegisterEntryIndicators?.LeaseHoldTitleIndicator;
           const tenure=isLeasehold?'Leasehold':'Freehold';
+          function vchip(id,sl,label){
+            if(cl[id]) return `<span class="chip" style="opacity:.55;">${svg('refresh',1.6)} ${label} <button class="linkbtn" data-restorepackchip="${id}" style="margin-left:2px;">re-fetch</button></span>`;
+            return `<span class="chip">${seal(sl,'sm')}${label}<button class="linkbtn" data-resetpackchip="${id}" style="margin-left:5px;opacity:.4;" title="clear">×</button></span>`;
+          }
           return `<div class="chips">
-            <span class="chip">${seal('ok','sm')}EPC ${epcBand}</span>
-            <span class="chip">${seal(ctBand==='D'?'warn':'ok','sm')}Council tax ${ctBand}</span>
-            <span class="chip">${seal('ok','sm')}Coalfield ${coalStatus}</span>
-            <span class="chip">${seal('ok','sm')}${tenure}</span>
+            ${vchip('epc','ok',`EPC ${epcBand}`)}
+            ${vchip('ct',ctBand==='D'?'warn':'ok',`Council tax ${ctBand}`)}
+            ${vchip('coalfield','ok',`Coalfield ${coalStatus}`)}
+            ${vchip('title','ok',tenure)}
           </div>`;
         },
         pend:'auto-sources listing information once the UPRN validates'},

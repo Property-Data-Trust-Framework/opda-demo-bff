@@ -503,13 +503,14 @@ function renderPassport(){
     return;
   }
   const pack = typeof realData!=='undefined' && realData.pack;
+  const packDone = payloadRetrieved('pack');
 
-  // EPC — potentialEnergyRating may not be in the API response; band is confirmed
-  const epcBand      = pack?.epc?.data?.currentEnergyEfficiencyBand ?? 'C';
-  const epcPotential = pack?.epc?.data?.potentialEnergyRating ?? 'B';
+  // EPC
+  const epcBand      = pack?.epc?.data?.currentEnergyEfficiencyBand ?? '—';
+  const epcPotential = pack?.epc?.data?.potentialEnergyRating ?? '—';
 
   // Council tax
-  const ctBand = pack?.councilTax?.data?.councilTaxBand ?? 'D';
+  const ctBand = pack?.councilTax?.data?.councilTaxBand ?? '—';
 
   // Coalfield
   const coalRaw    = pack?.coalfield?.data?.coalfieldStatus;
@@ -519,8 +520,8 @@ function renderPassport(){
 
   // Title register
   const isLeasehold = pack?.titleRegister?.data?.OCSummaryData?.RegisterEntryIndicators?.LeaseHoldTitleIndicator;
-  const tenure      = isLeasehold ? 'Leasehold' : 'Freehold';
-  const titleNum    = pack?.titleRegister?.data?.OCSummaryData?.Title?.TitleNumber ?? 'EXC10010';
+  const tenure      = isLeasehold === true ? 'Leasehold' : isLeasehold === false ? 'Freehold' : '—';
+  const titleNum    = pack?.titleRegister?.data?.OCSummaryData?.Title?.TitleNumber ?? '—';
 
   // Source of funds
   const sofDone = !!state.sof;
@@ -546,18 +547,20 @@ function renderPassport(){
 
   const cards = [
     {type:'kpis',title:'Council tax',span:3,payloadId:'council_tax',
-      items:[{label:'Band',value:ctBand,seal:'warn'}]},
+      items:[{label:'Band',value:packDone?ctBand:'—',seal:packDone?'warn':undefined}]},
     {type:'epc',title:'Energy — EPC',span:3,payloadId:'epc',
-      band:epcBand,value:epcBand,potential:epcPotential,seal:'ok',provLabel:'signed'},
+      band:packDone?epcBand:'—',value:packDone?epcBand:'—',potential:packDone?epcPotential:'—',
+      seal:packDone?'ok':undefined,provLabel:packDone?'signed':undefined},
     {type:'kpis',title:'Mining / coalfield',span:3,payloadId:'coalfield',
-      items:[{label:'Status',value:coalStatus,seal:coalSeal,sub:coalSub}]},
+      items:[{label:'Status',value:packDone?coalStatus:'—',seal:packDone?coalSeal:undefined,sub:packDone?coalSub:undefined}]},
     {type:'kpis',title:'Survey documents',span:3,payloadId:'surveys',
       items:[{label:'Status',value:survDone?`${survItems.length} doc${survItems.length===1?'':'s'}`:'Pending',small:true,
               seal:survDone?'ok':'warn',sub:survDone?'retrieved':'not yet retrieved'}]}
   ];
   const wide = [
-    {type:'kpis',title:'Title register &amp; ownership',span:8,cols:3,seal:'ok',provLabel:'signed HMLR',payloadId:'title_register',
-      items:[{label:'Tenure',value:tenure,small:true},{label:'Title number',value:titleNum,small:true},{label:'Price paid',value:'£xxx,xxx',small:true}]},
+    {type:'kpis',title:'Title register &amp; ownership',span:8,cols:3,
+      seal:packDone?'ok':undefined,provLabel:packDone?'signed HMLR':undefined,payloadId:'title_register',
+      items:[{label:'Tenure',value:packDone?tenure:'—',small:true},{label:'Title number',value:packDone?titleNum:'—',small:true},{label:'Price paid',value:'£xxx,xxx',small:true}]},
     {type:'map',title:'Location',span:4,payloadId:'address'}
   ];
   const docs = [
@@ -861,6 +864,7 @@ function setView(v){
   if(v==='passport') renderPassport();
   if(v==='payloads') renderPayloads();
   if(v==='flows') renderFlow();
+  updateProvCount();
   initMap();
   persist();
 }
@@ -908,7 +912,7 @@ function selectAddress(item){
   });
   sync();
   bffFetch(`/demo-api/chain/${item.uprn || '100091225620'}`)
-    .then(cr=>{ if(cr){ realData.chain=cr; renderChain(); if(state.view==='payloads') renderPayloads(); } });
+    .then(cr=>{ if(cr){ realData.chain=cr; renderChain(); updateProvCount(); if(state.view==='payloads') renderPayloads(); if(state.view==='passport') renderPassport(); } });
 }
 function resetSearch(){ state.addr=null; realData.address=null; realData.addressResults=null; sync(); }
 function inviteSeller(){ if(state.invited) return; state.invited={time:nowHM()}; mark(state.invited.time+'|identity.invite.sent'); sync(); }
@@ -925,6 +929,8 @@ function traceFunds(){
     .then(r=>{ if(r){ realData.sof=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='passport') renderPassport(); } });
 }
 function resetFunds(){ state.sof=null; sync(); }
+function resetPackChip(id){ state.packCleared=state.packCleared||{}; state.packCleared[id]=true; sync(); }
+function restorePackChip(id){ if(state.packCleared) delete state.packCleared[id]; sync(); }
 function retrieveSurveys(role){
   state.surv[role]={time:nowHM()}; mark(state.surv[role].time+'|documents.surveys.retrieved'); sync();
   bffFetch(`/demo-api/surveys/${resolvedUprn()}`)
@@ -979,13 +985,15 @@ document.body.addEventListener('click',e=>{
   const ids=e.target.closest('[data-idsubmit]'); if(ids){ submitId(ids.dataset.idsubmit); return; }
   const ide=e.target.closest('[data-idedit]'); if(ide){ editId(ide.dataset.idedit); return; }
   const sgv=e.target.closest('[data-survget]'); if(sgv){ retrieveSurveys(sgv.dataset.survget); return; }
+  const rpc=e.target.closest('[data-resetpackchip]'); if(rpc){ resetPackChip(rpc.dataset.resetpackchip); return; }
+  const spc=e.target.closest('[data-restorepackchip]'); if(spc){ restorePackChip(spc.dataset.restorepackchip); return; }
 });
 
 /* ============================================================
    INIT
    ============================================================ */
 try{ const s=JSON.parse(localStorage.getItem('opda-state')); if(s&&s.role&&roleObj(s.role)){ state=Object.assign(state,s); } }catch(e){}
-state.flags=state.flags||{}; state.id=state.id||{}; state.surv=state.surv||{}; state.gates=state.gates||{}; state.fired=state.fired||{};
+state.flags=state.flags||{}; state.id=state.id||{}; state.surv=state.surv||{}; state.gates=state.gates||{}; state.fired=state.fired||{}; state.packCleared=state.packCleared||{};
 renderRail();
 renderFlow();
 setView(state.view||'flows');

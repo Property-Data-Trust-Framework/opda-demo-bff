@@ -128,7 +128,7 @@ app.MapGet("/demo-api/health", () => Results.Ok(new { status = "healthy" }));
 
 app.MapGet("/demo-api/address", async (string q, IOpdaClient opda) =>
 {
-    var result = await opda.GetAsync($"/v1/places/find?query={Uri.EscapeDataString(q)}&maxresults=5");
+    var result = await opda.GetAsync($"/v1/places/find?query={Uri.EscapeDataString(q)}&maxresults=100");
     return result is not null ? Results.Ok(result) : Results.StatusCode(502);
 });
 
