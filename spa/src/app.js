@@ -507,24 +507,27 @@ function renderPassport(){
   }
   const pack = typeof realData!=='undefined' && realData.pack;
   const packDone = payloadRetrieved('pack');
+  // APIs return {data: T, provenance: {...}} when signing is enabled, or flat T when not.
+  const pd = item => item?.data ?? item;
 
   // EPC
-  const epcBand      = pack?.epc?.data?.currentEnergyEfficiencyBand ?? '—';
-  const epcPotential = pack?.epc?.data?.potentialEnergyRating ?? '—';
+  const epcBand      = pd(pack?.epc)?.currentEnergyEfficiencyBand ?? '—';
+  const epcPotential = pd(pack?.epc)?.potentialEnergyRating ?? '—';
 
   // Council tax
-  const ctBand = pack?.councilTax?.data?.councilTaxBand ?? '—';
+  const ctBand = pd(pack?.councilTax)?.councilTaxBand ?? '—';
 
   // Coalfield
-  const coalRaw    = pack?.coalfield?.data?.coalfieldStatus;
+  const coalRaw    = pd(pack?.coalfield)?.coalfieldStatus;
   const coalStatus = coalRaw==='ON_COALFIELD'?'ON':coalRaw==='OFF_COALFIELD'?'OFF':(coalRaw??'—');
   const coalSeal   = coalRaw==='ON_COALFIELD'?'warn':'ok';
   const coalSub    = coalRaw==='ON_COALFIELD'?'risk area':'low risk';
 
   // Title register
-  const isLeasehold = pack?.titleRegister?.data?.OCSummaryData?.RegisterEntryIndicators?.LeaseHoldTitleIndicator;
+  const lrData      = pd(pack?.titleRegister);
+  const isLeasehold = lrData?.OCSummaryData?.RegisterEntryIndicators?.LeaseHoldTitleIndicator;
   const tenure      = isLeasehold === true ? 'Leasehold' : isLeasehold === false ? 'Freehold' : '—';
-  const titleNum    = pack?.titleRegister?.data?.OCSummaryData?.Title?.TitleNumber ?? '—';
+  const titleNum    = lrData?.OCSummaryData?.Title?.TitleNumber ?? '—';
 
   // Source of funds
   const sofDone = !!state.sof;
@@ -555,7 +558,7 @@ function renderPassport(){
   const row1 = [
     {type:'kpis',title:'Council tax',span:4,payloadId:'council_tax',
       seal:packDone?'ok':undefined,provLabel:packDone?'signed':undefined,
-      items:[{label:'Band',value:packDone?ctBand:'—',seal:packDone?'warn':undefined}]},
+      items:[{label:'Band',value:packDone?ctBand:'—'}]},
     {type:'epc',title:'Energy — EPC',span:4,payloadId:'epc',
       band:packDone?epcBand:'—',value:packDone?epcBand:'—',potential:packDone?epcPotential:'—',
       seal:packDone?'ok':undefined,provLabel:packDone?'signed':undefined},

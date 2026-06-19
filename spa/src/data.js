@@ -360,12 +360,13 @@ const ROLES = [
         fired:()=>{
           const p=typeof realData!=='undefined'&&realData.pack;
           const cl=state.packCleared||{};
-          const epcBand=p?.epc?.data?.currentEnergyEfficiencyBand??'C';
-          const ctBand=p?.councilTax?.data?.councilTaxBand??'D';
-          const coalfieldRaw=p?.coalfield?.data?.coalfieldStatus;
+          const pd=item=>item?.data??item;
+          const epcBand=pd(p?.epc)?.currentEnergyEfficiencyBand??'—';
+          const ctBand=pd(p?.councilTax)?.councilTaxBand??'—';
+          const coalfieldRaw=pd(p?.coalfield)?.coalfieldStatus;
           const coalStatus=coalfieldRaw==='ON_COALFIELD'?'ON':coalfieldRaw==='OFF_COALFIELD'?'OFF':(coalfieldRaw??'—');
-          const isLeasehold=p?.titleRegister?.data?.OCSummaryData?.RegisterEntryIndicators?.LeaseHoldTitleIndicator;
-          const tenure=isLeasehold?'Leasehold':'Freehold';
+          const isLeasehold=pd(p?.titleRegister)?.OCSummaryData?.RegisterEntryIndicators?.LeaseHoldTitleIndicator;
+          const tenure=isLeasehold===true?'Leasehold':isLeasehold===false?'Freehold':'—';
           function vchip(id,sl,label){
             if(cl[id]) return `<span class="chip" style="opacity:.55;">${svg('refresh',1.6)} ${label} <button class="linkbtn" data-restorepackchip="${id}" style="margin-left:2px;">re-fetch</button></span>`;
             return `<span class="chip">${seal(sl,'sm')}${label}<button class="linkbtn" data-resetpackchip="${id}" style="margin-left:5px;opacity:.4;" title="clear">×</button></span>`;
@@ -546,13 +547,6 @@ const PAYLOADS = {
       claims:{ uprn:UPRN_ID, coalMiningReportRequired:false, surfaceHazardRisk:'NONE', developmentHighRiskArea:false,
         status:'OUTSIDE', reference:'CMR-2026-008812' } },
 
-    { id:'title_register', name:'Title register & ownership', service:'HM Land Registry', endpoint:'GET /v1/title/ABC12345',
-      signed:true, gate:'pack',
-      sig:{ alg:'ES256', kid:'hmlr-key-7', iss:'hmlandregistry.gov.uk', signedAt:'2026-06-11T09:16:48Z',
-        value:'MEYCIQDpL3xVbN8Qz9rT4uKpW1cWq3rJZ0kref2bYc9pL0aQ2KdRg==' },
-      claims:{ titleNumber:'ABC12345', uprn:UPRN_ID, tenure:'Freehold', classOfTitle:'ABSOLUTE',
-        registeredProprietors:['A. N. Seller'], priorityFrom:'2018-03-02', restrictions:0, charges:1 } },
-
     { id:'chain', name:'Property chain', service:'ViewMyChain', endpoint:'POST /api/v1/opda/chains',
       signed:true, gate:'chain',
       sig:{ alg:'ES256', kid:'vmc-key-1', iss:'viewmychain.com', signedAt:'2026-06-11T09:10:12Z',
@@ -583,6 +577,13 @@ const PAYLOADS = {
     { id:'property_pack', name:'Property pack', service:'Sprift / PDI', endpoint:'POST /property-pack/uprn',
       signed:true, gate:'sellerPack',
       sig:{ alg:'ES256', kid:'(from x-jws-signature header)', iss:'Sprift / PDI', signedAt:'', value:'' },
-      claims:{ note:'Detached JWS — signature covers the full property pack payload. Real value available in realData.sellerPack.jwsSignature once the Seller sources the pack.' } }
+      claims:{ note:'Detached JWS — signature covers the full property pack payload. Real value available in realData.sellerPack.jwsSignature once the Seller sources the pack.' } },
+
+    { id:'title_register', name:'Title register & ownership', service:'HM Land Registry', endpoint:'GET /v1/title/ABC12345',
+      signed:true, gate:'pack',
+      sig:{ alg:'ES256', kid:'hmlr-key-7', iss:'hmlandregistry.gov.uk', signedAt:'2026-06-11T09:16:48Z',
+        value:'MEYCIQDpL3xVbN8Qz9rT4uKpW1cWq3rJZ0kref2bYc9pL0aQ2KdRg==' },
+      claims:{ titleNumber:'ABC12345', uprn:UPRN_ID, tenure:'Freehold', classOfTitle:'ABSOLUTE',
+        registeredProprietors:['A. N. Seller'], priorityFrom:'2018-03-02', restrictions:0, charges:1 } }
   ]
 };
