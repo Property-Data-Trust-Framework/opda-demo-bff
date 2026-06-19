@@ -341,6 +341,7 @@ function renderFlow(){
   renderChain();
   updateTopSearch();
   initMap();
+  updateProvCount();
 }
 function render(){ renderRail(); renderFlow(); }
 
@@ -550,9 +551,9 @@ function renderPassport(){
       band:epcBand,value:epcBand,potential:epcPotential,seal:'ok',provLabel:'signed'},
     {type:'kpis',title:'Mining / coalfield',span:3,payloadId:'coalfield',
       items:[{label:'Status',value:coalStatus,seal:coalSeal,sub:coalSub}]},
-    {type:'kpis',title:'Source of funds',span:3,payloadId:'source_of_funds',
-      items:[{label:'Status',value:sofDone?'Verified':'Pending',small:true,
-              seal:sofDone?'ok':'warn',sub:sofDone?'deposit traced':'not yet traced'}]}
+    {type:'kpis',title:'Survey documents',span:3,payloadId:'surveys',
+      items:[{label:'Status',value:survDone?`${survItems.length} doc${survItems.length===1?'':'s'}`:'Pending',small:true,
+              seal:survDone?'ok':'warn',sub:survDone?'retrieved':'not yet retrieved'}]}
   ];
   const wide = [
     {type:'kpis',title:'Title register &amp; ownership',span:8,cols:3,seal:'ok',provLabel:'signed HMLR',payloadId:'title_register',
@@ -560,17 +561,17 @@ function renderPassport(){
     {type:'map',title:'Location',span:4,payloadId:'address'}
   ];
   const docs = [
-    survDone
-      ? {type:'docs',title:'Survey documents',span:6,seal:'ok',provLabel:'signed S3',payloadId:'surveys',items:survItems,
-           action:`<button class="linkbtn" data-survget="${state.role||'sconv'}">${svg('refresh',2)} re-fetch</button>`}
-      : {type:'status',tone:'warn',title:'Survey documents',span:6,
-         lines:['Not yet retrieved — pull surveys in the Seller or Buyer Conveyancer flow']},
+    sofDone
+      ? {type:'status',tone:'ok',title:'Source of funds',span:6,seal:'ok',provLabel:'signed',payloadId:'source_of_funds',
+         lines:['Deposit £62,000 traced to source','Savings + gifted deposit, both evidenced','Signed report · Armalytix']}
+      : {type:'status',tone:'warn',title:'Source of funds',span:6,
+         lines:['Not yet traced — run source of funds in the Buyer Conveyancer flow']},
     {type:'status',tone:amlAllDone?'ok':'warn',title:'Identity &amp; AML',span:6,
       seal:amlAllDone?'ok':'warn',provLabel:amlAllDone?'signed':undefined,lines:amlLines}
   ];
 
-  const passportSigned = PAYLOADS.sources.filter(s=>s.signed).length;
-  const passportTotal  = PAYLOADS.sources.length;
+  const passportSigned   = PAYLOADS.sources.filter(s=>s.signed&&payloadRetrieved(s.gate)).length;
+  const passportSignedOf = PAYLOADS.sources.filter(s=>s.signed).length;
   host.innerHTML = `
     <div class="persona" style="margin-bottom:22px;">
       <div class="avatar">${svg('home',1.7)}</div>
@@ -579,7 +580,7 @@ function renderPassport(){
         <h1>Property Passport</h1>
         <p>The single property truth every role reads from. Each source wears a provenance seal driven by its signature block — open <b>{ } JSON</b> on any card to inspect the signed payload behind it.</p>
       </div>
-      <div class="pstats"><div class="s"><div class="v ok">${passportSigned} / ${passportTotal}</div><div class="l">sources signed</div></div><div class="s"><div class="v">${passportTotal}</div><div class="l">APIs</div></div></div>
+      <div class="pstats"><div class="s"><div class="v ok">${passportSigned} / ${passportSignedOf}</div><div class="l">verified</div></div><div class="s"><div class="v">${passportSignedOf}</div><div class="l">APIs</div></div></div>
     </div>
     <div class="sectlabel">Property facts</div>
     <div class="grid" style="margin-bottom:18px;">${pgrid(cards)}</div>
@@ -601,6 +602,13 @@ function payloadRetrieved(gate){
     case 'chain':      return !!(typeof realData!=='undefined'&&realData.chain);
     default:           return !!state.addr;
   }
+}
+function updateProvCount(){
+  const pc=document.getElementById('provSumCount');
+  if(!pc) return;
+  const signed = PAYLOADS.sources.filter(s=>s.signed);
+  const retrieved = signed.filter(s=>payloadRetrieved(s.gate)).length;
+  pc.textContent=`${retrieved} / ${signed.length} verified`;
 }
 function gateHint(gate){
   if(gate==='sof')        return 'bconv';
@@ -984,9 +992,5 @@ setView(state.view||'flows');
 cascade();
 pollBffEvents();
 setInterval(pollBffEvents, 15000);
-// Populate header version tag + dynamic provenance count
-(()=>{
-  const vt=document.getElementById('verTag'); if(vt) vt.textContent='v'+VERSION;
-  const pc=document.getElementById('provSumCount');
-  if(pc){ const s=PAYLOADS.sources.filter(x=>x.signed).length; pc.textContent=`${s} / ${PAYLOADS.sources.length} verified`; }
-})();
+// Populate header version tag; provenance count is driven by updateProvCount() on every renderFlow()
+(()=>{ const vt=document.getElementById('verTag'); if(vt) vt.textContent='v'+VERSION; })();

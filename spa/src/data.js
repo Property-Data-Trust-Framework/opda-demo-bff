@@ -552,13 +552,6 @@ const PAYLOADS = {
           { uprn:'200001858900', address:'Top of chain', position:'top', ours:false }],
         milestones:[{ label:'Offer Accepted', date:'2026-05-12' },{ label:'Sold STC', date:'2026-05-20' }] } },
 
-    { id:'source_of_funds', name:'Source of funds', service:'IDV · Open Banking', endpoint:'GET /v1/source-of-funds',
-      signed:true, gate:'sof',
-      sig:{ alg:'ES256', kid:'idv-key-4', iss:'idv-provider.io', signedAt:'2026-06-11T10:02:15Z',
-        value:'MEUCIQC7mB1aWqNf0pV2kZ9rL8Wq3rJZ1cQ4rLl9aYk7mY0v1Ae2==' },
-      claims:{ subject:'buyer', depositAmount:62000, currency:'GBP', evidencedSource:'Savings + gift',
-        traced:true, accountVerified:true, provider:'open-banking' } },
-
     { id:'surveys', name:'Survey documents', service:'Documents store', endpoint:'GET /documents?type=survey',
       signed:true, gate:'surv',
       sig:{ alg:'ES256', kid:'docs-key-2', iss:'documents.smartpropdata', signedAt:'2026-06-11T11:20:51Z',
@@ -566,6 +559,13 @@ const PAYLOADS = {
       claims:{ uprn:UPRN_ID, store:'pre-signed-s3', count:2,
         documents:[ { name:'RICS Level 2 survey.pdf', type:'RICS_L2', size:2516582, sha256:'a3f9c0e2…b71d' },
           { name:'Floor plan.pdf', type:'FLOORPLAN', size:491520, sha256:'7b2188af…0c34' } ] } },
+
+    { id:'source_of_funds', name:'Source of funds', service:'IDV · Open Banking', endpoint:'GET /v1/source-of-funds',
+      signed:true, gate:'sof',
+      sig:{ alg:'ES256', kid:'idv-key-4', iss:'idv-provider.io', signedAt:'2026-06-11T10:02:15Z',
+        value:'MEUCIQC7mB1aWqNf0pV2kZ9rL8Wq3rJZ1cQ4rLl9aYk7mY0v1Ae2==' },
+      claims:{ subject:'buyer', depositAmount:62000, currency:'GBP', evidencedSource:'Savings + gift',
+        traced:true, accountVerified:true, provider:'open-banking' } },
 
     // Detached JWS (x-jws-signature header) — real value populated by the BFF from realData.sellerPack.jwsSignature
     { id:'property_pack', name:'Property pack', service:'Sprift / PDI', endpoint:'POST /property-pack/uprn',
