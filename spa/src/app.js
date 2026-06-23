@@ -441,19 +441,26 @@ function renderChain(){
 }
 function updateTopSearch(){
   const s=document.getElementById('topSearch'); if(!s) return;
-  if(state.addr){
+  // Only the "resolved" (bold) state once a specific property is picked. While a
+  // search is in flight / the multi-result picker is open, state.addr is just
+  // {time} with no address — fall through to the unbold italic placeholder.
+  if(state.addr && state.addr.address){
     s.classList.remove('empty');
     s.style.display='';
-    const addrLine = state.addr.address || '';
-    const addrParts = addrLine ? addrLine.split(',') : [];
-    document.getElementById('topAddr').textContent = addrParts.length ? addrParts[0].trim() : 'No property resolved';
-    document.getElementById('topSub').textContent = addrParts.length > 1 ? '· ' + addrParts.slice(1).join(',').trim() : '';
+    // Show the full address unsplit (formats vary too much to reliably bold a
+    // "first line") — the UPRN is the only emphasised element.
+    document.getElementById('topAddr').style.display='none';
+    document.getElementById('topSub').textContent = state.addr.address || '';
     const uprnNum = document.getElementById('topUprnNum');
     if(uprnNum) uprnNum.textContent = state.addr.uprn || '—';
     document.getElementById('topUprn').style.display = state.addr.uprn ? '' : 'none';
   } else {
     s.classList.add('empty');
-    s.style.display='none';
+    s.style.display='';
+    document.getElementById('topAddr').style.display='';
+    document.getElementById('topAddr').textContent = 'No property resolved';
+    document.getElementById('topSub').textContent = '· search in the Estate Agent flow';
+    document.getElementById('topUprn').style.display = 'none';
   }
 }
 

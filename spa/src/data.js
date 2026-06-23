@@ -4,7 +4,7 @@
    dependency graph (nodes + branches). Loaded before app.js.
    ============================================================ */
 
-const VERSION = '1.7';
+const VERSION = '1.8';
 
 /* ---------- icon set (inline SVG, 24-grid, stroke) ---------- */
 const I = {
@@ -572,18 +572,18 @@ const PAYLOADS = {
       sig:{ alg:'ES256', kid:'(from x-jws-signature header)', iss:'Sprift / PDI', signedAt:'', value:'' },
       claims:{ note:'Detached JWS — signature covers the full property pack payload. Real value available in realData.sellerPack.jwsSignature once the Seller sources the pack.' } },
 
-    { id:'title_register', name:'Title register & ownership', service:'HM Land Registry', endpoint:'GET /v1/title/ABC12345',
-      signed:true, gate:'pack',
-      sig:{ alg:'ES256', kid:'hmlr-key-7', iss:'hmlandregistry.gov.uk', signedAt:'2026-06-11T09:16:48Z',
-        value:'MEYCIQDpL3xVbN8Qz9rT4uKpW1cWq3rJZ0kref2bYc9pL0aQ2KdRg==' },
-      claims:{ titleNumber:'ABC12345', uprn:UPRN_ID, tenure:'Freehold', classOfTitle:'ABSOLUTE',
-        registeredProprietors:['A. N. Seller'], priorityFrom:'2018-03-02', restrictions:0, charges:1 } },
-
     { id:'source_of_funds', name:'Source of funds', service:'IDV · Open Banking', endpoint:'GET /v1/source-of-funds',
       signed:true, gate:'sof',
       sig:{ alg:'ES256', kid:'idv-key-4', iss:'idv-provider.io', signedAt:'2026-06-11T10:02:15Z',
         value:'MEUCIQC7mB1aWqNf0pV2kZ9rL8Wq3rJZ1cQ4rLl9aYk7mY0v1Ae2==' },
       claims:{ subject:'buyer', depositAmount:62000, currency:'GBP', evidencedSource:'Savings + gift',
-        traced:true, accountVerified:true, provider:'open-banking' } }
+        traced:true, accountVerified:true, provider:'open-banking' } },
+
+    { id:'title_register', name:'Title register & ownership', service:'HM Land Registry', endpoint:'GET /v1/title/ABC12345',
+      signed:true, gate:'pack',
+      sig:{ alg:'ES256', kid:'hmlr-key-7', iss:'hmlandregistry.gov.uk', signedAt:'2026-06-11T09:16:48Z',
+        value:'MEYCIQDpL3xVbN8Qz9rT4uKpW1cWq3rJZ0kref2bYc9pL0aQ2KdRg==' },
+      claims:{ titleNumber:'ABC12345', uprn:UPRN_ID, tenure:'Freehold', classOfTitle:'ABSOLUTE',
+        registeredProprietors:['A. N. Seller'], priorityFrom:'2018-03-02', restrictions:0, charges:1 } }
   ]
 };

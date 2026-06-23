@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>OPDA · Property Data Visualiser</title>
+<title>Smart Property Data Visualiser</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,500;0,600;0,700;1,500&family=Mukta:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -12,42 +12,46 @@
 </head>
 <body>
   <div class="app">
-    <!-- ============ TOP BAR ============ -->
+    <!-- ============ TOP BAR (branding) ============ -->
     <header class="topbar">
+      <img class="orglogos" src="spa-header-orgs.png" alt="CLC · Open Property Data Association · RAIDIAM" />
       <div class="brand">
-        <div class="mark">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>
-          <span class="sq"></span>
-        </div>
-        <div class="nm"><b>Open Property</b><span>Data Visualiser</span></div>
+        <div class="nm"><b>Smart Property</b><span>Data Visualiser</span></div>
       </div>
-      <div class="search" id="topSearch">
-        <span class="ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg></span>
-        <span class="addr" id="topAddr">No property resolved</span>
-        <span class="sub" id="topSub">· search in the Estate Agent flow</span>
-        <span class="uprn" id="topUprn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12l5 5L20 7"/></svg>UPRN <span id="topUprnNum">—</span></span>
-      </div>
-      <div class="topright">
-        <button class="resetdemo" data-resetall title="Reset the demo to its starting state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/></svg>Reset demo</button><span class="vertag" id="verTag"></span>
+      <div class="brandmeta">
+        <span class="vertag" id="verTag"></span>
         <span class="envpill"><span class="dot"></span>dev.api.smartpropdata.org.uk</span>
-        <span class="provsum"><span class="seal sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12l5 5L20 7"/></svg></span><span class="lbl">provenance<br/><b id="provSumCount"></b></span></span>
       </div>
     </header>
 
-    <!-- ============ ROLE TAB BAR ============ -->
-    <nav class="rolebar">
-      <div id="roleBar" style="display:contents"></div>
-      <div class="rsep"></div>
-      <span class="rsep-l">Future&nbsp;phases</span>
-      <button class="rtab future"><span class="rn">Phase 2</span><span class="rnm">Lender</span></button>
-      <button class="rtab future"><span class="rn">Phase 2</span><span class="rnm">Surveyor</span></button>
-      <button class="rtab future"><span class="rn">Phase 2</span><span class="rnm">Intermediary</span></button>
-      <div class="viewseg" id="viewseg">
-        <button class="on" data-view="flows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><path d="M7 6h8a3 3 0 010 6H9a3 3 0 000 6h8"/></svg>Role flows</button>
-        <button data-view="passport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Passport</button>
-        <button data-view="payloads"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4c-1.7 0-2 1.3-2 3v1.4C7 9.7 6.3 10.4 5 10.4c1.3 0 2 .7 2 2V14c0 1.7.3 3 2 3"/><path d="M15 4c1.7 0 2 1.3 2 3v1.4c0 1.3.7 2 2 2-1.3 0-2 .7-2 2V14c0 1.7-.3 3-2 3"/></svg>Payloads</button>
+    <!-- ============ LOWER HEADER (roles + control panel) ============ -->
+    <div class="headlower">
+      <nav class="rolebar">
+        <div id="roleBar" style="display:contents"></div>
+      </nav>
+      <div class="ctrlpanel">
+        <div class="ctrlrow ctrlrow-top">
+          <div class="search" id="topSearch">
+            <span class="addr" id="topAddr">No property resolved</span>
+            <span class="sub" id="topSub">· search in the Estate Agent flow</span>
+            <span class="uprn" id="topUprn">· UPRN <span id="topUprnNum">—</span></span>
+          </div>
+          <span class="provsum"><span class="seal sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12l5 5L20 7"/></svg></span><span class="lbl">provenance<br/><b id="provSumCount"></b></span></span>
+          <button class="resetdemo" data-resetall title="Reset the demo to its starting state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/></svg>Reset demo</button>
+        </div>
+        <div class="ctrlrow ctrlrow-bot">
+          <span class="rsep-l">Future&nbsp;phases</span>
+          <button class="rtab future"><span class="rn">Phase 2</span><span class="rnm">Lender</span></button>
+          <button class="rtab future"><span class="rn">Phase 2</span><span class="rnm">Surveyor</span></button>
+          <button class="rtab future"><span class="rn">Phase 2</span><span class="rnm">Intermediary</span></button>
+          <div class="viewseg" id="viewseg">
+            <button class="on" data-view="flows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><path d="M7 6h8a3 3 0 010 6H9a3 3 0 000 6h8"/></svg>Role flows</button>
+            <button data-view="passport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Passport</button>
+            <button data-view="payloads"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4c-1.7 0-2 1.3-2 3v1.4C7 9.7 6.3 10.4 5 10.4c1.3 0 2 .7 2 2V14c0 1.7.3 3 2 3"/><path d="M15 4c1.7 0 2 1.3 2 3v1.4c0 1.3.7 2 2 2-1.3 0-2 .7-2 2V14c0 1.7-.3 3-2 3"/></svg>Payloads</button>
+          </div>
+        </div>
       </div>
-    </nav>
+    </div>
 
     <!-- ============ MAIN ============ -->
     <div class="body">
