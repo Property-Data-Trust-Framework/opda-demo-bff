@@ -105,7 +105,10 @@ jobs:
             --query "DistributionList.Items[?DomainName=='$CF_DOMAIN'].Id | [0]" \
             --output text)
           aws s3 sync dist/ "s3://$BUCKET" --delete
-          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/demo/*"
+          # Invalidate the directory entry-points too, not just /demo/* — a bare
+          # /demo or /demo/ request maps to the index document and is NOT matched
+          # by /demo/*, which can leave a stale index.html cached after a deploy.
+          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/demo" "/demo/" "/demo/*"
 
       - name: Deployment summary
         if: always()
