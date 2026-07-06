@@ -102,3 +102,9 @@ variable "sprift_api_key" {
   type      = string
   sensitive = true
 }
+
+variable "armalytix_client_request_id" {
+  description = "Armalytix client request (correlation) id. Override per environment; not a secret."
+  type        = string
+  default     = "e574b05f-94fc-4249-be94-695bab8b268b"
+}

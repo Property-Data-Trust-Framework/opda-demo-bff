@@ -28,7 +28,7 @@ resource "aws_lambda_function" "app" {
       SPRIFT_BASE_URL         = var.sprift_base_url
       SPRIFT_SCOPE            = var.sprift_scope
       SPRIFT_API_KEY_PATH     = aws_ssm_parameter.sprift_api_key.name
-      ARMALYTIX_CLIENT_REQUEST_ID = "e574b05f-94fc-4249-be94-695bab8b268b"
+      ARMALYTIX_CLIENT_REQUEST_ID = var.armalytix_client_request_id
       DynamoConfig__TableName     = aws_dynamodb_table.webhook_events.name
     }
   }

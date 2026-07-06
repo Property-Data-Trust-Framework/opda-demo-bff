@@ -4,7 +4,7 @@
    dependency graph (nodes + branches). Loaded before app.js.
    ============================================================ */
 
-const VERSION = '1.8';
+const VERSION = '1.9';
 
 /* ---------- icon set (inline SVG, 24-grid, stroke) ---------- */
 const I = {
@@ -360,12 +360,12 @@ const ROLES = [
         fired:()=>{
           const p=typeof realData!=='undefined'&&realData.pack;
           const cl=state.packCleared||{};
-          const pd=item=>item?.data??item;
-          const epcBand=pd(p?.epc)?.currentEnergyEfficiencyBand??'—';
-          const ctBand=pd(p?.councilTax)?.councilTaxBand??'—';
-          const coalfieldRaw=pd(p?.coalfield)?.coalfieldStatus;
-          const coalStatus=coalfieldRaw==='ON_COALFIELD'?'ON':coalfieldRaw==='OFF_COALFIELD'?'OFF':(coalfieldRaw??'—');
-          const isLeasehold=pd(p?.titleRegister)?.OCSummaryData?.RegisterEntryIndicators?.LeaseHoldTitleIndicator;
+          const pp=p?.propertyPack;
+          const epcBand=pp?.energyEfficiency?.certificate?.currentEnergyRating??'—';
+          const ctBand=pp?.councilTax?.councilTaxBand??'—';
+          const coalfieldRaw=pp?.environmentalIssues?.coalMining?.riskIndicator;
+          const coalStatus=coalfieldRaw==='Yes'?'ON':coalfieldRaw==='No'?'OFF':'—';
+          const isLeasehold=pp?.titlesToBeSold?.[0]?.registerExtract?.ocSummaryData?.registerEntryIndicators?.leaseHoldTitleIndicator;
           const tenure=isLeasehold===true?'Leasehold':isLeasehold===false?'Freehold':'—';
           function vchip(id,sl,label){
             if(cl[id]) return `<span class="chip" style="opacity:.55;">${svg('refresh',1.6)} ${label} <button class="linkbtn" data-restorepackchip="${id}" style="margin-left:2px;">re-fetch</button></span>`;

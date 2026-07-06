@@ -142,7 +142,8 @@ app.MapGet("/demo-api/uprn/{uprn}", async (string uprn, IOpdaClient opda) =>
 });
 
 // ── GET /demo-api/pack/{uprn} ─────────────────────────────────────────────────
-// Fans out to EPC + Council Tax + Coalfield + LR Facade in parallel.
+// Fans out to EPC + Council Tax + Coalfield + LR Facade in parallel and merges
+// their PDTF v3.5 propertyPack fragments into one pack with per-source provenance.
 // titleNumber: demo default EXC10010 — pass ?titleNumber=... to override.
 
 app.MapGet("/demo-api/pack/{uprn}", async (
@@ -172,20 +173,23 @@ app.MapGet("/demo-api/pack/{uprn}", async (
         }
     };
 
-    var epcTask = opda.GetAsync($"/v1/epc/{paddedUprn}", ct);
-    var ctTask  = opda.GetAsync($"/v1/council-tax/{paddedUprn}", ct);
-    var mraTask = opda.GetAsync($"/v1/coalfield/{paddedUprn}", ct);
-    var lrTask  = opda.PostAsync("/opda/official-copies/v1/register-extract", lrBody, ct);
+    // Request each API's PDTF v3.5 propertyPack fragment and merge them into one
+    // pack with per-source provenance. Armalytix is excluded — PDTF v3.5 has no
+    // source-of-funds model (see the PDTF-Compliance wiki page). The ?schema=
+    // param is kept for downstream deployments that predate the PDTF-default flip.
+    var q = $"?schema={PdtfPackAssembler.SchemaSelector}";
+    var epcTask = opda.GetAsync($"/v1/epc/{paddedUprn}{q}", ct);
+    var ctTask  = opda.GetAsync($"/v1/council-tax/{paddedUprn}{q}", ct);
+    var mraTask = opda.GetAsync($"/v1/coalfield/{paddedUprn}{q}", ct);
+    var lrTask  = opda.PostAsync($"/opda/official-copies/v1/register-extract{q}", lrBody, ct);
 
     await Task.WhenAll(epcTask, ctTask, mraTask, lrTask);
 
-    return Results.Ok(new
-    {
-        epc           = epcTask.Result,
-        councilTax    = ctTask.Result,
-        coalfield     = mraTask.Result,
-        titleRegister = lrTask.Result,
-    });
+    return Results.Ok(PdtfPackAssembler.Assemble(
+        ("epc", epcTask.Result),
+        ("councilTax", ctTask.Result),
+        ("coalfield", mraTask.Result),
+        ("titleRegister", lrTask.Result)));
 });
 
 // ── GET /demo-api/surveys/{uprn} ──────────────────────────────────────────────

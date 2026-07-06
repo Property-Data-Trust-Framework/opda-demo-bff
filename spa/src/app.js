@@ -516,27 +516,28 @@ function renderPassport(){
   }
   const pack = typeof realData!=='undefined' && realData.pack;
   const packDone = payloadRetrieved('pack');
-  // APIs return {data: T, provenance: {...}} when signing is enabled, or flat T when not.
-  const pd = item => item?.data ?? item;
+  // The BFF returns a merged PDTF v3.5 pack: { propertyPack, provenance: {perSource} }.
+  const pp = pack?.propertyPack;
 
   // EPC
-  const epcBand      = pd(pack?.epc)?.currentEnergyEfficiencyBand ?? '—';
-  const epcPotential = pd(pack?.epc)?.potentialEnergyRating ?? '—';
+  const epcCert      = pp?.energyEfficiency?.certificate;
+  const epcBand      = epcCert?.currentEnergyRating ?? '—';
+  const epcPotential = epcCert?.potentialEnergyRating ?? '—';
 
-  // Council tax
-  const ctBand = pd(pack?.councilTax)?.councilTaxBand ?? '—';
+  // Council tax (band omitted upstream when unknown)
+  const ctBand = pp?.councilTax?.councilTaxBand ?? '—';
 
-  // Coalfield
-  const coalRaw    = pd(pack?.coalfield)?.coalfieldStatus;
-  const coalStatus = coalRaw==='ON_COALFIELD'?'ON':coalRaw==='OFF_COALFIELD'?'OFF':(coalRaw??'—');
-  const coalSeal   = coalRaw==='ON_COALFIELD'?'warn':'ok';
-  const coalSub    = coalRaw==='ON_COALFIELD'?'risk area':'low risk';
+  // Coalfield (v3.5 riskIndicator is "Yes"/"No"; absent when unknown)
+  const coalRaw    = pp?.environmentalIssues?.coalMining?.riskIndicator;
+  const coalStatus = coalRaw==='Yes'?'ON':coalRaw==='No'?'OFF':'—';
+  const coalSeal   = coalRaw==='Yes'?'warn':'ok';
+  const coalSub    = coalRaw==='Yes'?'risk area':'low risk';
 
-  // Title register
-  const lrData      = pd(pack?.titleRegister);
-  const isLeasehold = lrData?.OCSummaryData?.RegisterEntryIndicators?.LeaseHoldTitleIndicator;
+  // Title register (oc1 overlay shape, camelCase)
+  const lrData      = pp?.titlesToBeSold?.[0]?.registerExtract;
+  const isLeasehold = lrData?.ocSummaryData?.registerEntryIndicators?.leaseHoldTitleIndicator;
   const tenure      = isLeasehold === true ? 'Leasehold' : isLeasehold === false ? 'Freehold' : '—';
-  const titleNum    = lrData?.OCSummaryData?.Title?.TitleNumber ?? '—';
+  const titleNum    = lrData?.ocSummaryData?.title?.titleNumber ?? '—';
 
   // Source of funds
   const sofDone = !!state.sof;
@@ -674,11 +675,12 @@ function resolvedSig(s){
     const p=realData.uprn?.provenance;
     if(p) return { alg:p.alg, kid:p.kid, iss:'(OPDA)', signedAt:p.signedAt, value:p.signature };
   }
-  // For our OPDA API sources, pull provenance from realData.pack when available.
+  // For our OPDA API sources, pull the per-source provenance the BFF surfaces
+  // alongside the merged propertyPack.
   const packMap={epc:'epc',council_tax:'councilTax',coalfield:'coalfield',title_register:'titleRegister'};
   const key=packMap[s.id];
   if(key){
-    const p=realData.pack?.[key]?.provenance;
+    const p=realData.pack?.provenance?.[key];
     if(p) return { alg:p.alg, kid:p.kid, iss:'(OPDA)', signedAt:p.signedAt, value:p.signature };
   }
   return s.sig;
@@ -687,10 +689,10 @@ function resolvedClaims(s){
   const uprn = resolvedUprn();
   // Merge order: static fallback → real UPRN (overrides static UPRN_ID) → live API data (wins if it carries its own uprn)
   if(s.id==='address'){ const d=realData.address?.data?.[0]; if(d) return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='epc'){ const d=realData.pack?.epc?.data; if(d) return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='council_tax'){ const d=realData.pack?.councilTax?.data; if(d) return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='coalfield'){ const d=realData.pack?.coalfield?.data; if(d) return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='title_register'){ const d=realData.pack?.titleRegister?.data; if(d) return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='epc'){ const d=realData.pack?.propertyPack?.energyEfficiency?.certificate; if(d) return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='council_tax'){ const d=realData.pack?.propertyPack?.councilTax; if(d) return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='coalfield'){ const d=realData.pack?.propertyPack?.environmentalIssues?.coalMining; if(d) return Object.assign({},s.claims,{uprn},d); }
+  if(s.id==='title_register'){ const d=realData.pack?.propertyPack?.titlesToBeSold?.[0]?.registerExtract; if(d) return Object.assign({},s.claims,{uprn},d); }
   if(s.id==='chain'){ const d=realData.chain?.data?.data?.[0]; if(d) return Object.assign({},s.claims,{uprn},d); }
   if(s.id==='source_of_funds'){ if(realData.sof) return Object.assign({},s.claims,{uprn},realData.sof); }
   if(s.id==='surveys'){ if(realData.surveys) return Object.assign({},s.claims,{uprn},realData.surveys); }
