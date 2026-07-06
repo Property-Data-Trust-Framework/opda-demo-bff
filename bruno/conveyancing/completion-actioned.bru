@@ -1,0 +1,27 @@
+meta {
+  name: Completion Actioned (+ auto TID)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/demo-api/conveyancing/completion-actioned
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "transactionDid": "{{transactionDid}}"
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response status is triggered", function() {
+    expect(res.body.status).to.equal("triggered");
+  });
+}

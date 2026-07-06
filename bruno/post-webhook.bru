@@ -19,18 +19,7 @@ tests {
     expect(res.status).to.equal(200);
   });
 
-  test("response contains eventId", function() {
-    expect(res.body).to.have.property("eventId");
-    expect(res.body.eventId).to.be.a("string").and.not.be.empty;
-  });
-
   test("status is stored", function() {
     expect(res.body.status).to.equal("stored");
   });
-}
-
-script:after-response {
-  if (res.status === 200 && res.body.eventId) {
-    bru.setEnvVar("eventId", res.body.eventId);
-  }
 }

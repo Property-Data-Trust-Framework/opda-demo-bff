@@ -15,19 +15,33 @@ tests {
     expect(res.status).to.equal(200);
   });
 
-  test("response has epc", function() {
-    expect(res.body).to.have.property("epc");
+  test("response is a merged PDTF v3.5 propertyPack", function() {
+    expect(res.body).to.have.property("propertyPack");
+    expect(res.body.propertyPack).to.have.property("energyEfficiency");
+    expect(res.body.propertyPack).to.have.property("councilTax");
+    expect(res.body.propertyPack).to.have.property("environmentalIssues");
+    expect(res.body.propertyPack).to.have.property("titlesToBeSold");
   });
 
-  test("response has councilTax", function() {
-    expect(res.body).to.have.property("councilTax");
+  test("EPC fragment uses the v3.5 field names", function() {
+    const cert = res.body.propertyPack.energyEfficiency.certificate;
+    expect(cert).to.have.property("currentEnergyRating");
+    expect(cert).to.not.have.property("currentEnergyEfficiencyBand");
   });
 
-  test("response has coalfield", function() {
-    expect(res.body).to.have.property("coalfield");
+  test("legacy flat pack keys are gone", function() {
+    expect(res.body).to.not.have.property("epc");
+    expect(res.body).to.not.have.property("councilTax");
+    expect(res.body).to.not.have.property("coalfield");
+    expect(res.body).to.not.have.property("titleRegister");
   });
 
-  test("response has titleRegister", function() {
-    expect(res.body).to.have.property("titleRegister");
+  test("per-source provenance is surfaced", function() {
+    expect(res.body).to.have.property("provenance");
+    expect(res.body.provenance).to.have.property("epc");
+    expect(res.body.provenance).to.have.property("councilTax");
+    expect(res.body.provenance).to.have.property("coalfield");
+    expect(res.body.provenance).to.have.property("titleRegister");
+    expect(res.body.provenance.epc.alg).to.equal("RS256");
   });
 }

@@ -1,0 +1,27 @@
+meta {
+  name: Completion Set
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/demo-api/conveyancing/completion-set
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "transactionDid": "{{transactionDid}}"
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("response status is triggered", function() {
+    expect(res.body.status).to.equal("triggered");
+  });
+}
