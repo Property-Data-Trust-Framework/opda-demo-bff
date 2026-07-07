@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="OpdaDemoBff.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="1.7.3" />
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.500" />
     <PackageReference Include="AWSSDK.SimpleSystemsManagement" Version="3.7.500" />

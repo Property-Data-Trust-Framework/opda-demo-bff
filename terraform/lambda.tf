@@ -14,6 +14,7 @@ resource "aws_lambda_function" "app" {
     variables = {
       SMOOVE_BASE_URL        = var.smoove_base_url
       SMOOVE_API_KEY_PATH    = aws_ssm_parameter.smoove_api_key.name
+      SMOOVE_CALLBACK_URL    = "https://ext.smartpropdata.org.uk/webhook"
       OPDA_API_BASE_URL      = var.opda_api_base_url
       OPDA_CLIENT_CERT_PATH  = aws_ssm_parameter.opda_client_cert.name
       OPDA_CLIENT_KEY_PATH   = aws_ssm_parameter.opda_client_key.name

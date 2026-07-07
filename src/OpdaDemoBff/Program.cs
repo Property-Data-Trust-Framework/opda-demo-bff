@@ -80,6 +80,7 @@ if (!string.IsNullOrEmpty(smooveBaseUrl))
         SmooveClient.CreateAsync(
             smooveBaseUrl,
             Environment.GetEnvironmentVariable("SMOOVE_API_KEY_PATH") ?? "",
+            Environment.GetEnvironmentVariable("SMOOVE_CALLBACK_URL") ?? "",
             sp.GetRequiredService<ILogger<SmooveClient>>()).GetAwaiter().GetResult());
 }
 
@@ -402,6 +403,8 @@ app.MapPost("/demo-api/conveyancing/completion-set", async (ConveyRequest req, H
 {
     var smoove = ctx.RequestServices.GetService<ISmooveClient>();
     if (smoove is null) return Results.Problem("Smoove not configured — set SMOOVE_BASE_URL", statusCode: 503);
+    if (!await smoove.EnsureSubscribedAsync(ct))
+        return Results.Problem("Smoove webhook subscription was cleared down and re-subscribing failed", statusCode: 502);
     var ok = await smoove.PostAsync("internal/simulate/completion-set", new
     {
         transactionDid = req.TransactionDid,
@@ -418,6 +421,8 @@ app.MapPost("/demo-api/conveyancing/completion-actioned", async (ConveyRequest r
 {
     var smoove = ctx.RequestServices.GetService<ISmooveClient>();
     if (smoove is null) return Results.Problem("Smoove not configured — set SMOOVE_BASE_URL", statusCode: 503);
+    if (!await smoove.EnsureSubscribedAsync(ct))
+        return Results.Problem("Smoove webhook subscription was cleared down and re-subscribing failed", statusCode: 502);
     var ok = await smoove.PostAsync("internal/simulate/completion-actioned", new
     {
         transactionDid = req.TransactionDid,
