@@ -4,7 +4,7 @@
    dependency graph (nodes + branches). Loaded before app.js.
    ============================================================ */
 
-const VERSION = '1.9';
+const VERSION = '2.0';
 
 /* ---------- icon set (inline SVG, 24-grid, stroke) ---------- */
 const I = {
@@ -502,88 +502,118 @@ const ROLES = [
    `gate` maps a source to the flow state that "pulls" it.
    ============================================================ */
 const UPRN_ID = '100091234567';
+// Static fallback payloads for the offline demo. Each `claims` object is shaped
+// EXACTLY like the live payload the card shows (v3.5 propertyPack fragments for
+// the four pack APIs, the real envelope shapes elsewhere), and each `sig` is
+// shaped like a real per-source provenance block. Live data replaces these
+// wholesale — never merged — see resolvedClaims/resolvedSig in app.js.
 const PAYLOADS = {
   uprn: UPRN_ID,
   envelope: {
-    pack: 'property-pack/' + UPRN_ID,
-    uprn: UPRN_ID,
-    schema: 'pdtf/v0.6',
-    sourcesTotal: 7,
-    sourcesSigned: 6,
-    assembledBy: ['estate-agent', 'seller'],
-    assembledAt: '2026-06-11T09:18:40Z',
-    packSignature: { alg: 'ES256', kid: 'opda-pack-key-1', verified: true }
+    endpoint: 'GET /demo-api/pack/' + UPRN_ID,
+    schema: 'PDTF v3.5 propertyPack (@pdtf/schemas v3)',
+    propertyPackSections: ['energyEfficiency', 'councilTax', 'environmentalIssues', 'titlesToBeSold'],
+    packSignature: 'none — the merged pack is not re-signed; each fragment carries per-source provenance',
+    provenance: {
+      epc:           { alg:'RS256', kid:'a41f7c02-8f3d-4e19-9a55-0b6c2d8e1f30', signedAt:'2026-06-11T09:14:22Z' },
+      councilTax:    { alg:'RS256', kid:'c93b0e77-2a41-4d88-b1c6-7f5e9a3d2b18', signedAt:'2026-06-11T09:14:31Z' },
+      coalfield:     { alg:'RS256', kid:'5d28f1a9-6c07-4b3e-8e92-1a4b7c6d5e83', signedAt:'2026-06-11T09:15:03Z' },
+      titleRegister: { alg:'RS256', kid:'e07a3d51-4b96-42c8-a7f0-9c2e8b1d6a44', signedAt:'2026-06-11T09:16:48Z' }
+    }
   },
   sources: [
-    { id:'address', name:'Address & UPRN', service:'OS Places', endpoint:'GET /v1/places/uprn/'+UPRN_ID,
+    { id:'address', name:'Address & UPRN', service:'OPDA OS Places API', endpoint:'GET /v1/places/find?query=…',
       signed:true, gate:'addr',
-      sig:{ alg:'ES256', kid:'os-places-key-2', iss:'api.os.uk', signedAt:'2026-06-11T09:09:02Z',
-        value:'MEUCIQD2pak9wq8Lr3rJpZ0kref2bQ7nVxT1mYc9pL0aQ2KdWg==' },
-      claims:{ uprn:UPRN_ID, address:{ line1:'14 Elm Grove', locality:'Redland', town:'Bristol', postcode:'BS6 5DB' },
-        classification:'RD04', easting:358205, northing:174894, lat:51.4712, lng:-2.6003, match:'EXACT', confidence:0.98 } },
+      sig:{ alg:'RS256', kid:'7b1e4f92-3c58-4a06-bd77-2f9a8c1e5d40', iss:'(OPDA)', signedAt:'2026-06-11T09:09:02Z',
+        value:'kQv2mLf0pZ7gWq3rJZ1cQ4rLl9aYk7mY0v1AeD2pak9wq8Lr3rJpZ0kref2bQ7nVxT1mYc9pL0aQ2KdWgxN0pTr8' },
+      claims:{ uprn:UPRN_ID, address:'14, ELM GROVE, REDLAND, BRISTOL, BS6 5DB', udprn:'21929808',
+        xCoordinate:358205, yCoordinate:174894, localAuthority:'BRISTOL CITY COUNCIL', propertyType:'Terraced' } },
 
-    { id:'uprn_validation', name:'UPRN validation', service:'UPRN Validator', endpoint:'GET /v1/uprn/validate/'+UPRN_ID,
+    { id:'uprn_validation', name:'UPRN validation', service:'OPDA UPRN Validator', endpoint:'GET /v1/uprn/validate/'+UPRN_ID,
       signed:true, gate:'uprn',
-      sig:{ alg:'RS256', kid:'uprn-key-1', iss:'(OPDA)', signedAt:'', value:'' },
-      claims:{ uprn:UPRN_ID, valid:true, classification:'RD04', source:'AddressBase' } },
+      sig:{ alg:'RS256', kid:'2c806e13-9f47-4b2a-8d15-6e3a1c9f7b52', iss:'(OPDA)', signedAt:'2026-06-11T09:09:14Z',
+        value:'aQk7mY0v1Ae2Tn0pXc8bWq3rJZ0kKdRfH8nZ1cQ4rLl9pak9wq8Lr3rJpZ0kref2bQ7nVxT1mYc9pL0aQ2KdWg2m' },
+      claims:{ valid:true } },
 
-    { id:'epc', name:'Energy Performance (EPC)', service:'EPC Register', endpoint:'GET /v1/property/epc',
+    { id:'epc', name:'Energy Performance (EPC)', service:'OPDA EPC API', endpoint:'GET /v1/epc/'+UPRN_ID,
       signed:true, gate:'pack',
-      sig:{ alg:'ES256', kid:'epc-2024-key-3', iss:'epc.opendatacommunities.org', signedAt:'2026-06-11T09:14:22Z',
-        value:'MEQCIH8nZ1cQ4rLl9aQk7mY0v1Ae2Tn0pXc8bWq3rJZ0kKdRf==' },
-      claims:{ uprn:UPRN_ID, lmkKey:'1234-5678-9012-3456-7890', currentEnergyRating:'C', currentEnergyEfficiency:72,
-        potentialEnergyRating:'B', potentialEnergyEfficiency:84, co2EmissionsCurrent:2.8,
-        inspectionDate:'2021-07-14', lodgementDate:'2021-07-20', expiryDate:'2031-07-13' } },
+      sig:{ alg:'RS256', kid:'a41f7c02-8f3d-4e19-9a55-0b6c2d8e1f30', iss:'(OPDA)', signedAt:'2026-06-11T09:14:22Z',
+        value:'H8nZ1cQ4rLl9aQk7mY0v1Ae2Tn0pXc8bWq3rJZ0kKdRfpZ7gWq3rJZ1cQ4rLl9aYk7mY0v1AkQv2mLf0aQ2KdWgxN' },
+      claims:{ propertyPack:{ energyEfficiency:{ certificate:{
+        certificateNumber:'8206-7942-1030-8846-9002',
+        address:'14 Elm Grove, Redland, Bristol, BS6 5DB', address1:'14 Elm Grove',
+        postcode:'BS6 5DB', posttown:'Bristol',
+        localAuthorityLabel:'Bristol City Council', constituencyLabel:'Bristol West',
+        currentEnergyRating:'C', potentialEnergyRating:'B', lodgementDate:'2021-07-20' } } } } },
 
-    { id:'council_tax', name:'Council tax band', service:'VOA', endpoint:'GET /v1/property/council-tax',
+    { id:'council_tax', name:'Council tax band', service:'OPDA Council Tax API', endpoint:'GET /v1/council-tax/'+UPRN_ID,
       signed:true, gate:'pack',
-      sig:{ alg:'RS256', kid:'council-tax-key-1', iss:'(OPDA)', signedAt:'', value:'' },
-      claims:{ uprn:UPRN_ID, band:'D', localAuthority:'Bristol City Council', annualCharge:2304.18, taxYear:'2026-27', source:'VOA' } },
+      sig:{ alg:'RS256', kid:'c93b0e77-2a41-4d88-b1c6-7f5e9a3d2b18', iss:'(OPDA)', signedAt:'2026-06-11T09:14:31Z',
+        value:'xN0pTr8kQv2mLf0pZ7gWq3rJZ1cQ4rLl9aYk7mY0v1AH8nZ1cQ4rLl9aQk7mY0v1Ae2Tn0pXc8bWq3rJZ0kKdRfpZ' },
+      claims:{ propertyPack:{ councilTax:{ councilTaxBand:'D' } } } },
 
-    { id:'coalfield', name:'Mining / coalfield', service:'Coal Authority', endpoint:'GET /v1/mining/coalfield',
+    { id:'coalfield', name:'Mining / coalfield', service:'OPDA Mining Remediation API', endpoint:'GET /v1/coalfield/'+UPRN_ID,
       signed:true, gate:'pack',
-      sig:{ alg:'ES256', kid:'coal-auth-key-1', iss:'coalauthority.gov.uk', signedAt:'2026-06-11T09:15:03Z',
-        value:'MEUCIQCxN0pTr8kQv2mLf0pZ7gWq3rJZ1cQ4rLl9aYk7mY0v1A==' },
-      claims:{ uprn:UPRN_ID, coalMiningReportRequired:false, surfaceHazardRisk:'NONE', developmentHighRiskArea:false,
-        status:'OUTSIDE', reference:'CMR-2026-008812' } },
+      sig:{ alg:'RS256', kid:'5d28f1a9-6c07-4b3e-8e92-1a4b7c6d5e83', iss:'(OPDA)', signedAt:'2026-06-11T09:15:03Z',
+        value:'pZ7gWq3rJZ1cQ4rLl9aYk7mY0v1AxN0pTr8kQv2mLf0H8nZ1cQ4rLl9aQk7mY0v1Ae2Tn0pXc8bWq3rJZ0kKdRfaQ' },
+      claims:{ propertyPack:{ environmentalIssues:{ coalMining:{ riskIndicator:'No' } } } } },
 
     { id:'chain', name:'Property chain', service:'ViewMyChain', endpoint:'POST /api/v1/opda/chains',
       signed:true, gate:'chain',
-      sig:{ alg:'ES256', kid:'vmc-key-1', iss:'viewmychain.com', signedAt:'2026-06-11T09:10:12Z',
-        value:'MEUCIQDvMc3pTr8kQv2mLf0pZ7gWq3rJZ1cQ4rLl9aYk7mY0v1AiIA==' },
-      claims:{ uprn:UPRN_ID, chainLength:3,
+      sig:{ alg:'RS256', kid:'vmc-opda-2026-1', iss:'ViewMyChain', signedAt:'2026-06-11T09:10:12Z',
+        value:'DvMc3pTr8kQv2mLf0pZ7gWq3rJZ1cQ4rLl9aYk7mY0v1ApZ0kref2bQ7nVxT1mYc9pL0aQ2KdWgH8nZ1cQ4rLl9aQ' },
+      claims:{ data:[{
         properties:[
-          { uprn:'200001858100', address:'First-time buyer', position:'bottom', ours:false },
-          { uprn:UPRN_ID, address:'14 Elm Grove, Redland, Bristol BS6 5DB', position:'this sale', ours:true },
-          { uprn:'200001858900', address:'Top of chain', position:'top', ours:false }],
-        milestones:[{ label:'Offer Accepted', date:'2026-05-12' },{ label:'Sold STC', date:'2026-05-20' }] } },
+          { uprn:'200001858100', address:'2 Hill View, Bristol', position:1 },
+          { uprn:UPRN_ID, address:'14 Elm Grove, Redland, Bristol BS6 5DB', position:2 },
+          { uprn:'200001858900', address:'8 Orchard Way, Bristol', position:3 }],
+        milestones:[{ label:'Offer Accepted', date:'2026-05-12' },{ label:'SSTC', date:'2026-05-20' }] }] } },
 
-    { id:'surveys', name:'Survey documents', service:'Documents store', endpoint:'GET /documents?type=survey',
+    { id:'surveys', name:'Survey documents', service:'OPDA Survey Shack API', endpoint:'GET /v1/documents/'+UPRN_ID,
       signed:true, gate:'surv',
-      sig:{ alg:'ES256', kid:'docs-key-2', iss:'documents.smartpropdata', signedAt:'2026-06-11T11:20:51Z',
-        value:'MEQCIBxW9pLqT3mK7nZ0vQ1f9Wq3rJZ0kref2bYc9pL0aQ2KdRg4rLl==' },
-      claims:{ uprn:UPRN_ID, store:'pre-signed-s3', count:2,
-        documents:[ { name:'RICS Level 2 survey.pdf', type:'RICS_L2', size:2516582, sha256:'a3f9c0e2…b71d' },
-          { name:'Floor plan.pdf', type:'FLOORPLAN', size:491520, sha256:'7b2188af…0c34' } ] } },
+      sig:{ alg:'RS256', kid:'91c5b2e8-0d74-4f3a-a6b9-8e1f5c2d7a03', iss:'(OPDA)', signedAt:'2026-06-11T11:20:51Z',
+        value:'BxW9pLqT3mK7nZ0vQ1f9Wq3rJZ0kref2bYc9pL0aQ2KdRg4rLlH8nZ1cQ4rLl9aQk7mY0v1Ae2Tn0pXc8bWq3rJZ0' },
+      claims:{ uprn:UPRN_ID, documents:[
+        { documentType:'full_buyer_report', filename:'full_buyer_report-01.pdf',
+          url:'https://opda-survey-shack.s3.eu-west-2.amazonaws.com/full_buyer_report-01.pdf?X-Amz-Expires=3600',
+          expiresAt:'2026-06-11T12:20:51Z' },
+        { documentType:'full_homeowner_report', filename:'full_homeowner_report.pdf',
+          url:'https://opda-survey-shack.s3.eu-west-2.amazonaws.com/full_homeowner_report.pdf?X-Amz-Expires=3600',
+          expiresAt:'2026-06-11T12:20:51Z' } ] } },
 
     // Detached JWS (x-jws-signature header) — real value populated by the BFF from realData.sellerPack.jwsSignature
-    { id:'property_pack', name:'Property pack', service:'Sprift / PDI', endpoint:'POST /property-pack/uprn',
+    { id:'property_pack', name:'Property pack', service:'Sprift / PDI', endpoint:'POST /appraisal/v1/property-pack/uprn',
       signed:true, gate:'sellerPack',
-      sig:{ alg:'ES256', kid:'(from x-jws-signature header)', iss:'Sprift / PDI', signedAt:'', value:'' },
-      claims:{ note:'Detached JWS — signature covers the full property pack payload. Real value available in realData.sellerPack.jwsSignature once the Seller sources the pack.' } },
+      sig:{ alg:'RS256', kid:'(from x-jws-signature header)', iss:'Sprift / PDI', signedAt:'(see header)', value:'' },
+      claims:{ propertyPack:{
+        address:{ line1:'14 Elm Grove', town:'Bristol', postcode:'BS6 5DB' },
+        priceInformation:{ price:475000, priceQualifier:'Guide price' },
+        councilTax:{ councilTaxBand:'D' } } } },
 
-    { id:'source_of_funds', name:'Source of funds', service:'IDV · Open Banking', endpoint:'GET /v1/source-of-funds',
+    { id:'source_of_funds', name:'Source of funds', service:'OPDA Armalytix API', endpoint:'GET /v1/source-of-funds/{clientRequestId}',
       signed:true, gate:'sof',
-      sig:{ alg:'ES256', kid:'idv-key-4', iss:'idv-provider.io', signedAt:'2026-06-11T10:02:15Z',
-        value:'MEUCIQC7mB1aWqNf0pV2kZ9rL8Wq3rJZ1cQ4rLl9aYk7mY0v1Ae2==' },
-      claims:{ subject:'buyer', depositAmount:62000, currency:'GBP', evidencedSource:'Savings + gift',
-        traced:true, accountVerified:true, provider:'open-banking' } },
+      sig:{ alg:'RS256', kid:'4e97d0b6-1a83-4c25-9f60-3b7e8d2c5a19', iss:'(OPDA)', signedAt:'2026-06-11T10:02:15Z',
+        value:'C7mB1aWqNf0pV2kZ9rL8Wq3rJZ1cQ4rLl9aYk7mY0v1Ae2H8nZ1cQ4rLl9aQk7mY0v1Ae2Tn0pXc8bWq3rJZ0kKdR' },
+      claims:{ reportId:'rep_8f2c41', reportType:'SOURCE_OF_FUNDS', issuedAt:'2026-06-11T10:02:15Z',
+        status:'AVAILABLE', applicantName:'Robert Malytix',
+        proofOfFunds:{ totalBalance:68450.12, formattedTotalBalance:'£68,450.12', currency:'GBP',
+          amountRequired:62000, formattedAmountRequired:'£62,000.00',
+          surplus:6450.12, formattedSurplus:'£6,450.12', result:'PASS' },
+        accounts:[{ bankName:'Monzo', sortCode:'04-00-04', accountNumber:'••••1234', accountName:'R Malytix' }],
+        income:{ averageMonthlyTakeHome:3120.55, formattedAverageMonthlyTakeHome:'£3,120.55',
+          sources:[{ type:'SALARY', description:'ACME LTD', averageMonthly:3120.55,
+            formattedAverageMonthly:'£3,120.55', verified:true }] },
+        flags:[] } },
 
-    { id:'title_register', name:'Title register & ownership', service:'HM Land Registry', endpoint:'GET /v1/title/ABC12345',
+    { id:'title_register', name:'Title register & ownership', service:'OPDA LR Facade', endpoint:'POST /official-copies/v1/register-extract',
       signed:true, gate:'pack',
-      sig:{ alg:'ES256', kid:'hmlr-key-7', iss:'hmlandregistry.gov.uk', signedAt:'2026-06-11T09:16:48Z',
-        value:'MEYCIQDpL3xVbN8Qz9rT4uKpW1cWq3rJZ0kref2bYc9pL0aQ2KdRg==' },
-      claims:{ titleNumber:'ABC12345', uprn:UPRN_ID, tenure:'Freehold', classOfTitle:'ABSOLUTE',
-        registeredProprietors:['A. N. Seller'], priorityFrom:'2018-03-02', restrictions:0, charges:1 } }
+      sig:{ alg:'RS256', kid:'e07a3d51-4b96-42c8-a7f0-9c2e8b1d6a44', iss:'(OPDA)', signedAt:'2026-06-11T09:16:48Z',
+        value:'DpL3xVbN8Qz9rT4uKpW1cWq3rJZ0kref2bYc9pL0aQ2KdRgH8nZ1cQ4rLl9aQk7mY0v1Ae2Tn0pXc8bWq3rJZ0kKd' },
+      claims:{ propertyPack:{ titlesToBeSold:[{ registerExtract:{ ocSummaryData:{
+        title:{ titleNumber:'EXC10010', classOfTitleCode:'A' },
+        registerEntryIndicators:{ leaseHoldTitleIndicator:false },
+        propertyAddress:{ postcodeZone:{ postcode:'BS6 5DB' } },
+        proprietorship:{ registeredProprietorParty:[{ name:{ forenamesName:'A N', surname:'Seller' } }] },
+        pricePaidEntry:{ infills:{ amount:'£150,000' } } } } }] } } }
   ]
 };

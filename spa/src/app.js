@@ -660,10 +660,10 @@ function gateHint(gate){
   return 'agent';
 }
 // Return real sig data from BFF realData when available, else fall back to static model.
+const provSig=(p,iss)=>p?{ alg:p.alg, kid:p.kid, iss, signedAt:p.signedAt, value:p.signature }:null;
 function resolvedSig(s){
   if(s.id==='chain'){
-    const p=realData.chain?.provenance;
-    if(p) return { alg:p.alg, kid:p.kid, iss:'ViewMyChain', signedAt:p.signedAt, value:p.signature };
+    const r=provSig(realData.chain?.provenance,'ViewMyChain'); if(r) return r;
   }
   if(s.id==='property_pack'){
     const jws=realData.sellerPack?.jwsSignature;
@@ -672,33 +672,47 @@ function resolvedSig(s){
     if(jws) return { alg:'ES256', kid:'(x-jws-signature)', iss, signedAt:'(see header)', value:jws };
   }
   if(s.id==='uprn_validation'){
-    const p=realData.uprn?.provenance;
-    if(p) return { alg:p.alg, kid:p.kid, iss:'(OPDA)', signedAt:p.signedAt, value:p.signature };
+    const r=provSig(realData.uprn?.provenance,'(OPDA)'); if(r) return r;
   }
-  // For our OPDA API sources, pull the per-source provenance the BFF surfaces
+  if(s.id==='address'){
+    const r=provSig(realData.address?.provenance,'(OPDA)'); if(r) return r;
+  }
+  if(s.id==='surveys'){
+    const r=provSig(realData.surveys?.provenance,'(OPDA)'); if(r) return r;
+  }
+  if(s.id==='source_of_funds'){
+    const r=provSig(realData.sof?.provenance,'(OPDA)'); if(r) return r;
+  }
+  // For our OPDA pack sources, pull the per-source provenance the BFF surfaces
   // alongside the merged propertyPack.
   const packMap={epc:'epc',council_tax:'councilTax',coalfield:'coalfield',title_register:'titleRegister'};
   const key=packMap[s.id];
   if(key){
-    const p=realData.pack?.provenance?.[key];
-    if(p) return { alg:p.alg, kid:p.kid, iss:'(OPDA)', signedAt:p.signedAt, value:p.signature };
+    const r=provSig(realData.pack?.provenance?.[key],'(OPDA)'); if(r) return r;
   }
   return s.sig;
 }
+// Return the live payload VERBATIM when the BFF has supplied it, else the static
+// fixture. Never merge the two — the JSON shown must be exactly what the wire
+// carried (or an honest offline stand-in shaped identically; see data.js).
 function resolvedClaims(s){
-  const uprn = resolvedUprn();
-  // Merge order: static fallback → real UPRN (overrides static UPRN_ID) → live API data (wins if it carries its own uprn)
-  if(s.id==='address'){ const d=realData.address?.data?.[0]; if(d) return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='epc'){ const d=realData.pack?.propertyPack?.energyEfficiency?.certificate; if(d) return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='council_tax'){ const d=realData.pack?.propertyPack?.councilTax; if(d) return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='coalfield'){ const d=realData.pack?.propertyPack?.environmentalIssues?.coalMining; if(d) return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='title_register'){ const d=realData.pack?.propertyPack?.titlesToBeSold?.[0]?.registerExtract; if(d) return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='chain'){ const d=realData.chain?.data?.data?.[0]; if(d) return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='source_of_funds'){ if(realData.sof) return Object.assign({},s.claims,{uprn},realData.sof); }
-  if(s.id==='surveys'){ if(realData.surveys) return Object.assign({},s.claims,{uprn},realData.surveys); }
-  if(s.id==='property_pack'){ const d=realData.sellerPack?.data; if(d&&typeof d==='object') return Object.assign({},s.claims,{uprn},d); }
-  if(s.id==='uprn_validation'){ const d=realData.uprn?.data; if(d) return Object.assign({},s.claims,{uprn},d); }
-  return Object.assign({}, s.claims, {uprn});
+  if(s.id==='address'){ const d=realData.address?.data?.[0]; if(d) return d; }
+  if(s.id==='uprn_validation'){ const d=realData.uprn?.data; if(d) return d; }
+  // The four pack APIs: rebuild each API's { propertyPack: {fragment} } payload
+  // from the merged pack. Each source owns a disjoint subtree, so this is
+  // exactly the fragment its per-source provenance signature covers.
+  const pp=realData.pack?.propertyPack;
+  if(pp){
+    if(s.id==='epc' && pp.energyEfficiency)            return { propertyPack:{ energyEfficiency: pp.energyEfficiency } };
+    if(s.id==='council_tax' && pp.councilTax)          return { propertyPack:{ councilTax: pp.councilTax } };
+    if(s.id==='coalfield' && pp.environmentalIssues)   return { propertyPack:{ environmentalIssues: pp.environmentalIssues } };
+    if(s.id==='title_register' && pp.titlesToBeSold)   return { propertyPack:{ titlesToBeSold: pp.titlesToBeSold } };
+  }
+  if(s.id==='chain'){ const d=realData.chain?.data; if(d) return d; }
+  if(s.id==='source_of_funds'){ const d=realData.sof; if(d) return d.data ?? d; }
+  if(s.id==='surveys'){ const d=realData.surveys; if(d) return d.data ?? d; }
+  if(s.id==='property_pack'){ const d=realData.sellerPack?.data; if(d&&typeof d==='object') return d; }
+  return s.claims;
 }
 function jsonHighlight(obj){
   const json = JSON.stringify(obj, null, 2)
@@ -752,25 +766,39 @@ function renderPayloads(){
   const got = PAYLOADS.sources.filter(s=>payloadRetrieved(s.gate));
   const signedCount = got.filter(s=>s.signed).length;
   const uprn = resolvedUprn();
-  const env = Object.assign({}, PAYLOADS.envelope, { uprn, pack: 'property-pack/'+uprn, sourcesRetrieved: got.length, sourcesSigned: signedCount });
+  // Envelope card: summarise the REAL merged pack when the BFF has supplied it
+  // (sections present + per-source provenance, minus the signature values which
+  // live on each source card), else the identically-shaped static fixture.
+  const livePack = typeof realData!=='undefined' && realData.pack;
+  const env = livePack
+    ? {
+        endpoint: 'GET /demo-api/pack/'+uprn,
+        schema: 'PDTF v3.5 propertyPack (@pdtf/schemas v3)',
+        propertyPackSections: Object.keys(livePack.propertyPack||{}),
+        packSignature: 'none — the merged pack is not re-signed; each fragment carries per-source provenance',
+        provenance: Object.fromEntries(Object.entries(livePack.provenance||{})
+          .map(([k,p])=>[k,{ alg:p.alg, kid:p.kid, signedAt:p.signedAt }])),
+        sourcesRetrieved: got.length, sourcesSigned: signedCount,
+      }
+    : Object.assign({}, PAYLOADS.envelope, { sourcesRetrieved: got.length, sourcesSigned: signedCount });
   host.innerHTML = `
     <div class="persona" style="margin-bottom:22px;">
       <div class="avatar">${svg('braces',1.7)}</div>
       <div class="ptxt">
         <span class="rolenum">Inspector lens</span>
         <h1>Signed payloads</h1>
-        <p>The raw, signed source responses behind every Passport fact. Each is a self-contained JWS — verify the signature, read the claims. Open <b>{ } JSON</b> on a Passport card to land on its source.</p>
+        <p>The raw source responses behind every Passport fact, exactly as they came off the wire. Each carries an RS256/JCS provenance block (the seller pack a detached JWS) — verify the signature, read the claims. Open <b>{ } JSON</b> on a Passport card to land on its source.</p>
       </div>
       <div class="pstats">
         <div class="s"><div class="v">${got.length} / ${PAYLOADS.sources.length}</div><div class="l">retrieved</div></div>
         <div class="s"><div class="v ok">${signedCount}</div><div class="l">signed</div></div>
-        <div class="s"><div class="v">ES256</div><div class="l">algorithm</div></div>
+        <div class="s"><div class="v">RS256</div><div class="l">algorithm</div></div>
       </div>
     </div>
     <div class="sectlabel">Property-pack envelope</div>
     <div class="grid" style="margin-bottom:18px;">
       <div class="card plcard plenvelope s12" id="pl-envelope">
-        <div class="plhead"><div class="plt"><span class="plname">Property pack</span><span class="plmeta mono">${env.pack}</span></div><span class="plseal ok">${svg('check',2.4)} pack verified</span></div>
+        <div class="plhead"><div class="plt"><span class="plname">Property pack</span><span class="plmeta mono">${env.endpoint}</span></div><span class="plseal ok">${svg('check',2.4)} ${livePack?'assembled · live':'assembled'}</span></div>
         <pre class="pljson"><code>${jsonHighlight(env)}</code></pre>
       </div>
     </div>
@@ -931,6 +959,9 @@ function searchAddress(){
   bffFetch('/demo-api/address?q='+encodeURIComponent(q))
     .then(r=>{
       if(r && r.data && r.data.length){
+        // Keep the response's provenance so the Inspector can show the live
+        // signature once an address is selected.
+        realData.addressProvenance = r.provenance || null;
         if(r.data.length === 1){
           selectAddress(r.data[0]);
         } else {
@@ -940,12 +971,13 @@ function searchAddress(){
       } else {
         // No BFF reachable (offline demo / static serve) — resolve to a synthetic
         // address so the search still completes and the UPRN chip renders.
+        realData.addressProvenance = null;
         selectAddress({ uprn: resolvedUprn(), address: q });
       }
     });
 }
 function selectAddress(item){
-  realData.address = { data: [item] };
+  realData.address = { data: [item], provenance: realData.addressProvenance || undefined };
   realData.addressResults = null;
   state.addr = Object.assign(state.addr || {time:nowHM()}, {
     uprn: item.uprn,
@@ -955,7 +987,7 @@ function selectAddress(item){
   bffFetch(`/demo-api/chain/${item.uprn || '100091225620'}`)
     .then(cr=>{ if(cr){ realData.chain=cr; renderChain(); updateProvCount(); if(state.view==='payloads') renderPayloads(); if(state.view==='passport') renderPassport(); } });
 }
-function resetSearch(){ state.addr=null; realData.address=null; realData.addressResults=null; sync(); }
+function resetSearch(){ state.addr=null; realData.address=null; realData.addressResults=null; realData.addressProvenance=null; sync(); }
 function inviteSeller(){ if(state.invited) return; state.invited={time:nowHM()}; mark(state.invited.time+'|identity.invite.sent'); sync(); }
 function resetInvite(){ state.invited=null; sync(); }
 function publishListing(){ if(state.published) return; state.published={time:nowHM()}; mark(state.published.time+'|listing.published'); sync(); }
