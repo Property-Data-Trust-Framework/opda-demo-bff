@@ -4,7 +4,7 @@
    dependency graph (nodes + branches). Loaded before app.js.
    ============================================================ */
 
-const VERSION = '2.0';
+const VERSION = '2.1';
 
 /* ---------- icon set (inline SVG, 24-grid, stroke) ---------- */
 const I = {

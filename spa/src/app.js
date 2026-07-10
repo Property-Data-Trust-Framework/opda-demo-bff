@@ -7,7 +7,8 @@
 
 /* ---------- state ---------- */
 let state = { role:'agent', view:'flows', flags:{}, fired:{}, gates:{}, id:{}, surv:{},
-              addr:null, invited:null, published:null, advid:null, sof:null, conveyPending:{} };
+              addr:null, invited:null, published:null, advid:null, sof:null, conveyPending:{},
+              pdtfAdded:{} };
 let firing = null;
 
 // Real data fetched from the BFF — preferred by renderers where available
@@ -154,13 +155,13 @@ function cascade(){
           const node=nodeById(f.role,f.id); if(node.effect) node.effect();
           // Trigger real BFF calls for auto nodes that have API counterparts
           if(f.role==='agent'&&f.id==='uprn'){
-            bffFetch(`/demo-api/uprn/${resolvedUprn()}`).then(r=>{ if(r){ realData.uprn=r; renderFlow(); initMap(); if(state.view==='payloads') renderPayloads(); } });
+            bffFetch(`/demo-api/uprn/${resolvedUprn()}`).then(r=>{ if(r){ realData.uprn=r; renderFlow(); initMap(); if(state.view==='payloads') renderPayloads(); if(state.view==='pdtf') renderPdtf(); } });
           }
           if(f.role==='agent'&&f.id==='pack'){
-            bffFetch(`/demo-api/pack/${resolvedUprn()}`).then(r=>{ if(r){ realData.pack=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='passport') renderPassport(); } });
+            bffFetch(`/demo-api/pack/${resolvedUprn()}`).then(r=>{ if(r){ realData.pack=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='pdtf') renderPdtf(); if(state.view==='passport') renderPassport(); } });
           }
           if(f.role==='seller'&&f.id==='packSourced'){
-            bffFetch(`/demo-api/property-pack/${resolvedUprn()}`).then(r=>{ if(r){ realData.sellerPack=r; renderFlow(); if(state.view==='payloads') renderPayloads(); } });
+            bffFetch(`/demo-api/property-pack/${resolvedUprn()}`).then(r=>{ if(r){ realData.sellerPack=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='pdtf') renderPdtf(); } });
           }
           persist(); render(); cascade();
         }, 760);
@@ -930,8 +931,10 @@ function setView(v){
   document.getElementById('flowsView')?.classList.toggle('active',v==='flows');
   document.getElementById('passportView')?.classList.toggle('active',v==='passport');
   document.getElementById('payloadsView')?.classList.toggle('active',v==='payloads');
+  document.getElementById('pdtfView')?.classList.toggle('active',v==='pdtf');
   if(v==='passport') renderPassport();
   if(v==='payloads') renderPayloads();
+  if(v==='pdtf') renderPdtf();
   if(v==='flows') renderFlow();
   updateProvCount();
   initMap();
@@ -947,7 +950,7 @@ function mark(key){ state.lastKey=key; }
 function resetAll(){
   const role=state.role||'agent', view=state.view||'flows';
   state={ role, view, flags:{}, fired:{}, gates:{}, id:{}, surv:{}, conveyPending:{},
-          addr:null, invited:null, published:null, advid:null, sof:null, lastKey:null,
+          pdtfAdded:{}, addr:null, invited:null, published:null, advid:null, sof:null, lastKey:null,
           transactionDid: 'did:web:example.com:transaction:' + crypto.randomUUID() };
   firing=null; realData={}; render(); setView(view); persist(); cascade();
 }
@@ -985,7 +988,7 @@ function selectAddress(item){
   });
   sync();
   bffFetch(`/demo-api/chain/${item.uprn || '100091225620'}`)
-    .then(cr=>{ if(cr){ realData.chain=cr; renderChain(); updateProvCount(); if(state.view==='payloads') renderPayloads(); if(state.view==='passport') renderPassport(); } });
+    .then(cr=>{ if(cr){ realData.chain=cr; renderChain(); updateProvCount(); if(state.view==='payloads') renderPayloads(); if(state.view==='pdtf') renderPdtf(); if(state.view==='passport') renderPassport(); } });
 }
 function resetSearch(){ state.addr=null; realData.address=null; realData.addressResults=null; realData.addressProvenance=null; sync(); }
 function inviteSeller(){ if(state.invited) return; state.invited={time:nowHM()}; mark(state.invited.time+'|identity.invite.sent'); sync(); }
@@ -999,7 +1002,7 @@ function resetAdvId(){ state.advid=null; sync(); }
 function traceFunds(){
   state.sof={time:nowHM()}; mark(state.sof.time+'|funds.traced'); sync();
   bffFetch('/demo-api/source-of-funds', {method:'POST'})
-    .then(r=>{ if(r){ realData.sof=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='passport') renderPassport(); } });
+    .then(r=>{ if(r){ realData.sof=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='pdtf') renderPdtf(); if(state.view==='passport') renderPassport(); } });
 }
 function resetFunds(){ state.sof=null; sync(); }
 function resetPackChip(id){ state.packCleared=state.packCleared||{}; state.packCleared[id]=true; sync(); }
@@ -1007,7 +1010,7 @@ function restorePackChip(id){ if(state.packCleared) delete state.packCleared[id]
 function retrieveSurveys(role){
   state.surv[role]={time:nowHM()}; mark(state.surv[role].time+'|documents.surveys.retrieved'); sync();
   bffFetch(`/demo-api/surveys/${resolvedUprn()}`)
-    .then(r=>{ if(r){ realData.surveys=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='passport') renderPassport(); } });
+    .then(r=>{ if(r){ realData.surveys=r; renderFlow(); if(state.view==='payloads') renderPayloads(); if(state.view==='pdtf') renderPdtf(); if(state.view==='passport') renderPassport(); } });
 }
 function requestPack(gate){ const c=state.gates[gate]||{}; if(c.status==='granted') return; state.gates[gate]={status:'requested',reqTime:nowHM(),decTime:null}; mark(state.gates[gate].reqTime+'|consent.requested'); sync(); }
 function decideConsent(gate,ok){ const c=state.gates[gate]||{}; state.gates[gate]={status:ok?'granted':'denied',reqTime:c.reqTime,decTime:nowHM(),by:state.role}; mark(state.gates[gate].decTime+'|seller.consent.'+(ok?'granted':'denied')); sync(); }
@@ -1019,7 +1022,99 @@ function resetEvent(id){ if(state.fired) delete state.fired[id];
   if(id==='completion_actioned'){ delete state.fired.tid_received; if(state.flags) delete state.flags['bconv.tid']; }
   sync(); }
 
-function persist(){ try{ const c=Object.assign({},state); localStorage.setItem('opda-state',JSON.stringify(c)); }catch(e){} }
+function persist(){ try{ const c=Object.assign({},state); delete c._pdtfFresh; localStorage.setItem('opda-state',JSON.stringify(c)); }catch(e){} }
+
+/* ============================================================
+   PDTF PASSPORT BUILDER (manual assembly, 4th view)
+   ============================================================ */
+// Fully manual by design: retrieval (payloadRetrieved) and assembly
+// (state.pdtfAdded) are separate steps, so the presenter controls demo pacing.
+// Nothing is auto-added when a gate fires.
+function pdtfRowState(s){
+  if(state.pdtfAdded?.[s.id]) return 'added';
+  return payloadRetrieved(s.gate) ? 'ready' : 'pending';
+}
+// The assembled document: only explicitly-added sources. Claims come from
+// resolvedClaims() (live BFF data wins over the static fixture) and the
+// verification block from resolvedSig() — the same resolution payloadCard uses.
+function pdtfDoc(){
+  const claims = PAYLOADS.sources.filter(s=>state.pdtfAdded?.[s.id]).map(s=>{
+    const sig = resolvedSig(s);
+    return {
+      source: s.id,
+      addedAt: state.pdtfAdded[s.id].time,
+      verification: { trust_framework:'uk_pdtf', alg:sig.alg||null, kid:sig.kid||null, signedAt:sig.signedAt||null },
+      claims: resolvedClaims(s),
+    };
+  });
+  return { transactionId: state.transactionDid||null, verified_claims: claims };
+}
+function renderPdtf(){
+  const host=document.getElementById('pdtfView'); if(!host) return;
+  const fresh=state._pdtfFresh; delete state._pdtfFresh;
+  if(!state.addr?.uprn){
+    host.innerHTML=`<div class="plempty">${svg('shield',1.6)}<div><h2>Nothing to assemble yet</h2><p>Resolve a property in the Estate Agent flow — each payload retrieved in the role flows becomes a claim you can add to the PDTF document here.</p><button class="btn amber" data-jump="agent">${svg('arrow')} Go to the Estate Agent</button></div></div>`;
+    return;
+  }
+  const readyCount = PAYLOADS.sources.filter(s=>pdtfRowState(s)==='ready').length;
+  const addedCount = PAYLOADS.sources.filter(s=>pdtfRowState(s)==='added').length;
+  const rows = PAYLOADS.sources.map(s=>{
+    const st=pdtfRowState(s);
+    const right = st==='pending' ? `<span class="prwait">${svg('clock',2)} pending</span>`
+      : st==='ready' ? `<button class="addbtn" data-pdtfadd="${s.id}">+ Add</button>`
+      : `<span class="pradd-tick">${svg('check',2.4)} added</span>`;
+    return `<div class="pdtfrow ${st}${fresh===s.id?' just-added':''}">
+      <div class="prt"><span class="prn">${s.name}</span><span class="prm mono">${s.service}</span></div>${right}</div>`;
+  }).join('');
+  const toolbar = addedCount===PAYLOADS.sources.length
+    ? `<span class="pdtfdonemsg">${svg('check',2.2)} All sources added</span>`
+    : `<button class="addallbtn" data-pdtfaddall ${readyCount?'':'disabled'}>+ Add all ready (${readyCount})</button>`;
+  host.innerHTML = `
+    <div class="persona" style="margin-bottom:22px;">
+      <div class="avatar">${svg('shield',1.7)}</div>
+      <div class="ptxt">
+        <span class="rolenum">Shared layer</span>
+        <h1>PDTF JSON</h1>
+        <p>Assemble the PDTF transaction document by hand. Payloads retrieved in the role flows appear as <b>ready</b> — nothing lands in the document until you add it, so the pacing is yours.</p>
+      </div>
+      <div class="pstats">
+        <div class="s"><div class="v ok">${addedCount}</div><div class="l">added</div></div>
+        <div class="s"><div class="v">${readyCount}</div><div class="l">ready</div></div>
+        <div class="s"><div class="v">${PAYLOADS.sources.length}</div><div class="l">sources</div></div>
+      </div>
+    </div>
+    <div class="pdtfwrap">
+      <div class="pdtfledger">
+        <div class="pdtftoolbar">${toolbar}</div>
+        ${rows}
+      </div>
+      <div class="pdtfdocwrap">
+        <div class="pdtfdochead"><span class="plname">Assembled document</span><span class="plmeta mono">${addedCount} claim${addedCount===1?'':'s'}</span><button class="addbtn" data-pdtfcopy>Copy JSON</button></div>
+        <pre class="pljson pdtfjson"><code>${jsonHighlight(pdtfDoc())}</code></pre>
+      </div>
+    </div>`;
+}
+function addPdtfClaim(id){
+  state.pdtfAdded=state.pdtfAdded||{};
+  if(state.pdtfAdded[id]) return;
+  state.pdtfAdded[id]={time:nowHM()};
+  state._pdtfFresh=id;
+  renderPdtf(); persist();
+}
+function addAllPdtfReady(){
+  state.pdtfAdded=state.pdtfAdded||{};
+  let last=null;
+  PAYLOADS.sources.forEach(s=>{ if(pdtfRowState(s)==='ready'){ state.pdtfAdded[s.id]={time:nowHM()}; last=s.id; } });
+  if(last) state._pdtfFresh=last;
+  renderPdtf(); persist();
+}
+function copyPdtfDoc(){
+  const txt=JSON.stringify(pdtfDoc(),null,2);
+  const fallback=()=>{ const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); }catch(e){} ta.remove(); };
+  if(navigator.clipboard?.writeText) navigator.clipboard.writeText(txt).catch(fallback); else fallback();
+  const b=document.querySelector('[data-pdtfcopy]');
+  if(b){ const t=b.textContent; b.textContent='Copied ✓'; setTimeout(()=>{ b.textContent=t; },1200); }
+}
 
 /* ============================================================
    EVENTS
@@ -1060,13 +1155,16 @@ document.body.addEventListener('click',e=>{
   const sgv=e.target.closest('[data-survget]'); if(sgv){ retrieveSurveys(sgv.dataset.survget); return; }
   const rpc=e.target.closest('[data-resetpackchip]'); if(rpc){ resetPackChip(rpc.dataset.resetpackchip); return; }
   const spc=e.target.closest('[data-restorepackchip]'); if(spc){ restorePackChip(spc.dataset.restorepackchip); return; }
+  const pa=e.target.closest('[data-pdtfadd]'); if(pa){ addPdtfClaim(pa.dataset.pdtfadd); return; }
+  if(e.target.closest('[data-pdtfaddall]')){ addAllPdtfReady(); return; }
+  if(e.target.closest('[data-pdtfcopy]')){ copyPdtfDoc(); return; }
 });
 
 /* ============================================================
    INIT
    ============================================================ */
 try{ const s=JSON.parse(localStorage.getItem('opda-state')); if(s&&s.role&&roleObj(s.role)){ state=Object.assign(state,s); } }catch(e){}
-state.flags=state.flags||{}; state.id=state.id||{}; state.surv=state.surv||{}; state.gates=state.gates||{}; state.fired=state.fired||{}; state.packCleared=state.packCleared||{}; state.conveyPending=state.conveyPending||{};
+state.flags=state.flags||{}; state.id=state.id||{}; state.surv=state.surv||{}; state.gates=state.gates||{}; state.fired=state.fired||{}; state.packCleared=state.packCleared||{}; state.conveyPending=state.conveyPending||{}; state.pdtfAdded=state.pdtfAdded||{};
 renderRail();
 renderFlow();
 setView(state.view||'flows');
