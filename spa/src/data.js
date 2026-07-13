@@ -4,7 +4,7 @@
    dependency graph (nodes + branches). Loaded before app.js.
    ============================================================ */
 
-const VERSION = '2.1';
+const VERSION = '2.2';
 
 /* ---------- icon set (inline SVG, 24-grid, stroke) ---------- */
 const I = {
@@ -332,7 +332,7 @@ function publishBody(){
     btn:'Publish listing', btnCls:'pen', bIcon:'send', attr:'data-publish'});
 }
 function reviewBody(){
-  return `<div class="card s12" style="background:none;border:0;padding:0;box-shadow:none;"><div class="note"><span class="ni">${svg('eye')}</span><div>The Buyer flow opens straight into the full <b>Property Passport</b>, read-only, with every source seal visible — nothing is re-fetched.<div style="margin-top:12px;"><button class="btn" onclick="setView('passport')">${svg('eye')} Open Property Passport</button></div></div></div></div>`;
+  return `<div class="card s12" style="background:none;border:0;padding:0;box-shadow:none;"><div class="note"><span class="ni">${svg('eye')}</span><div>The Buyer flow opens straight into the full <b>Property Logbook</b>, read-only, with every source seal visible — nothing is re-fetched.<div style="margin-top:12px;"><button class="btn" onclick="setView('passport')">${svg('eye')} Open Property Logbook</button></div></div></div></div>`;
 }
 
 /* ============================================================
@@ -422,7 +422,7 @@ const ROLES = [
   },
 
   { id:'buyer', n:'Role 2', name:'Buyer', icon:'user', avatar:'user',
-    desc:'Verifies identity, requests the Property Pack the seller already sourced, and reads it as the shared Property Passport once consent lands — nothing is re-sourced.',
+    desc:'Verifies identity, requests the Property Pack the seller already sourced, and reads it as the shared Property Logbook once consent lands — nothing is re-sourced.',
     stats:[{v:'3',l:'graph steps'},{v:'0',l:'re-sourced',ok:true},{v:'6/7',l:'inherited seals',ok:true}],
     nodes:[
       {id:'start',kind:'origin',ln:'Listing found'},
@@ -434,7 +434,7 @@ const ROLES = [
       {id:'released',kind:'merge',ln:'Pack released',api:'consume pack',prereqs:['request','@seller_consent'],
         fired:()=>`<span class="chip">${seal('ok','sm')}Pack released — inherits the seller's seals, untouched</span>`,
         pend:"waiting on the seller's consent"},
-      {id:'review',kind:'auto',ln:'Read the Passport',api:'GET full passport',prereqs:['released'],
+      {id:'review',kind:'auto',ln:'Read the Logbook',api:'GET full logbook',prereqs:['released'],
         fired:reviewBody, pend:'available once the pack is released'}
     ],
     branches:[{id:'seller_consent',label:'Seller consent',from:'request',to:'released',party:'Seller',tab:'seller',
@@ -497,7 +497,7 @@ const ROLES = [
 
 /* ============================================================
    SIGNED PAYLOADS — the raw, signed source responses behind
-   each Passport fact (Inspector lens). Per-source JWS objects
+   each Logbook fact (Inspector lens). Per-source JWS objects
    nested under one property-pack envelope.
    `gate` maps a source to the flow state that "pulls" it.
    ============================================================ */

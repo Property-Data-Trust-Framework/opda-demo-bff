@@ -512,7 +512,7 @@ function pgrid(specs){
 function renderPassport(){
   const host = document.getElementById('passportView');
   if(!state.addr?.uprn){
-    host.innerHTML=`<div class="plempty">${svg('eye',1.6)}<div><h2>No property resolved</h2><p>Resolve a property in the Estate Agent flow to open the Property Passport.</p><button class="btn amber" data-jump="agent">${svg('arrow')} Go to the Estate Agent</button></div></div>`;
+    host.innerHTML=`<div class="plempty">${svg('eye',1.6)}<div><h2>No property resolved</h2><p>Resolve a property in the Estate Agent flow to open the Property Logbook.</p><button class="btn amber" data-jump="agent">${svg('arrow')} Go to the Estate Agent</button></div></div>`;
     return;
   }
   const pack = typeof realData!=='undefined' && realData.pack;
@@ -618,7 +618,7 @@ function renderPassport(){
       <div class="avatar">${svg('home',1.7)}</div>
       <div class="ptxt">
         <span class="rolenum">Shared layer</span>
-        <h1>Property Passport</h1>
+        <h1>Property Logbook</h1>
         <p>The single property truth every role reads from. Each source wears a provenance seal driven by its signature block — open <b>{ } JSON</b> on any card to inspect the signed payload behind it.</p>
       </div>
       <div class="pstats"><div class="s"><div class="v ok">${passportSigned} / ${passportSignedOf}</div><div class="l">verified</div></div><div class="s"><div class="v">${passportSignedOf}</div><div class="l">APIs</div></div></div>
@@ -788,7 +788,7 @@ function renderPayloads(){
       <div class="ptxt">
         <span class="rolenum">Inspector lens</span>
         <h1>Signed payloads</h1>
-        <p>The raw source responses behind every Passport fact, exactly as they came off the wire. Each carries an RS256/JCS provenance block (the seller pack a detached JWS) — verify the signature, read the claims. Open <b>{ } JSON</b> on a Passport card to land on its source.</p>
+        <p>The raw source responses behind every Logbook fact, exactly as they came off the wire. Each carries an RS256/JCS provenance block (the seller pack a detached JWS) — verify the signature, read the claims. Open <b>{ } JSON</b> on a Logbook card to land on its source.</p>
       </div>
       <div class="pstats">
         <div class="s"><div class="v">${got.length} / ${PAYLOADS.sources.length}</div><div class="l">retrieved</div></div>
@@ -945,7 +945,9 @@ function setView(v){
    ACTIONS  (each ends with sync → render + persist + cascade)
    ============================================================ */
 function sync(){ render(); persist(); cascade(); }
-function setRole(id){ state.role=id; render(); persist(); }
+// Selecting a role always lands you in the Role flows view — a role tab click
+// (or a jump button) means "take me to that role's flow", whatever view is open.
+function setRole(id){ state.role=id; if(state.view!=='flows') setView('flows'); render(); persist(); }
 function mark(key){ state.lastKey=key; }
 function resetAll(){
   const role=state.role||'agent', view=state.view||'flows';
