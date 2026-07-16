@@ -7,7 +7,7 @@ on:
 env:
   AWS_REGION: eu-west-2
   TF_VERSION: "1.10.5"
-  DOTNET_VERSION: "9.0"
+  DOTNET_VERSION: "10.0"
 
 jobs:
   test:
