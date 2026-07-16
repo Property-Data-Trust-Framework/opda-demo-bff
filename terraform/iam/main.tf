@@ -82,9 +82,9 @@ resource "aws_iam_role_policy" "github_actions" {
         Effect = "Allow"
         Action = [
           "lambda:AddPermission", "lambda:CreateFunction",
-          "lambda:DeleteFunction", "lambda:GetFunction",
+          "lambda:DeleteFunction", "lambda:DeleteFunctionConcurrency", "lambda:GetFunction",
           "lambda:GetFunctionCodeSigningConfig", "lambda:GetPolicy",
-          "lambda:ListVersionsByFunction", "lambda:RemovePermission",
+          "lambda:ListVersionsByFunction", "lambda:PutFunctionConcurrency", "lambda:RemovePermission",
           "lambda:TagResource", "lambda:UntagResource",
           "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration",
         ]
