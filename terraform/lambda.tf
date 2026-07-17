@@ -22,6 +22,7 @@ resource "aws_lambda_function" "app" {
       OPDA_CLIENT_ID         = var.opda_client_id
       OPDA_TOKEN_ENDPOINT    = var.opda_token_endpoint
       DISCONNECTED_MODE      = var.disconnected_mode ? "true" : "false"
+      PARTNER_TOKEN_ENDPOINT = var.partner_token_endpoint
       OPDA_SCOPE             = "land-registry"
       VMC_BASE_URL            = var.vmc_base_url
       VMC_SCOPE               = "land-registry"

@@ -120,3 +120,9 @@ variable "disconnected_mode" {
   description = "Fully self-contained sandbox mode: skip token minting and serve canned fixtures for unreachable upstreams (ADR-0012). Flip via the DISCONNECTED_MODE GitHub variable + redeploy."
   default     = false
 }
+
+variable "partner_token_endpoint" {
+  type        = string
+  description = "Token endpoint for PARTNER-facing clients (VMC/PDI/Sprift). Stays on Raidiam even when opda_token_endpoint points at the auth stub — partners introspect against Raidiam (ADR-0012)."
+  default     = "https://matls-auth.directory.pdtf.raidiam.io/token"
+}

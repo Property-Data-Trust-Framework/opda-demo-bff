@@ -38,6 +38,9 @@ builder.Services.AddSingleton<IOpdaClient>(sp =>
     }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult(), sp));
 
 // ViewMyChain — same mTLS cert + signing key, different base URL and scope.
+// Partner clients (VMC/PDI/Sprift) mint from PARTNER_TOKEN_ENDPOINT (Raidiam) even
+// when OPDA_TOKEN_ENDPOINT points at the auth stub — partners introspect against
+// Raidiam and a stub token means nothing to them (ADR-0012).
 builder.Services.AddKeyedSingleton<IOpdaClient>("vmc", (sp, _) =>
     WrapForMode(OpdaClient.CreateAsync(new OpdaClientConfig
     {
@@ -46,7 +49,7 @@ builder.Services.AddKeyedSingleton<IOpdaClient>("vmc", (sp, _) =>
         ClientKeyPath  = Environment.GetEnvironmentVariable("OPDA_CLIENT_KEY_PATH") ?? "",
         SigningKeyPath  = Environment.GetEnvironmentVariable("OPDA_SIGNING_KEY_PATH") ?? "",
         ClientId        = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
-        TokenEndpoint   = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
+        TokenEndpoint   = Environment.GetEnvironmentVariable("PARTNER_TOKEN_ENDPOINT") ?? Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
         Scope           = Environment.GetEnvironmentVariable("VMC_SCOPE") ?? "transaction-status",
         Disconnected    = disconnectedMode,
     }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult(), sp));
@@ -60,7 +63,7 @@ builder.Services.AddKeyedSingleton<IOpdaClient>("pdi", (sp, _) =>
         ClientKeyPath  = Environment.GetEnvironmentVariable("OPDA_CLIENT_KEY_PATH") ?? "",
         SigningKeyPath  = Environment.GetEnvironmentVariable("OPDA_SIGNING_KEY_PATH") ?? "",
         ClientId        = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
-        TokenEndpoint   = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
+        TokenEndpoint   = Environment.GetEnvironmentVariable("PARTNER_TOKEN_ENDPOINT") ?? Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
         Scope           = Environment.GetEnvironmentVariable("PDI_SCOPE") ?? "property-pack",
         Disconnected    = disconnectedMode,
     }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult(), sp));
@@ -78,7 +81,7 @@ if (!string.IsNullOrEmpty(spriftBaseUrl))
             ClientKeyPath   = Environment.GetEnvironmentVariable("OPDA_CLIENT_KEY_PATH") ?? "",
             SigningKeyPath   = Environment.GetEnvironmentVariable("OPDA_SIGNING_KEY_PATH") ?? "",
             ClientId         = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
-            TokenEndpoint    = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
+            TokenEndpoint    = Environment.GetEnvironmentVariable("PARTNER_TOKEN_ENDPOINT") ?? Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
             Scope            = Environment.GetEnvironmentVariable("SPRIFT_SCOPE") ?? "property-pack",
             ApiKeyPath       = Environment.GetEnvironmentVariable("SPRIFT_API_KEY_PATH"),
             ApiKeyHeaderName = "x-api-key",
