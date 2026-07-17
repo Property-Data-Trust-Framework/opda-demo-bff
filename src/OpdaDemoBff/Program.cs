@@ -14,8 +14,18 @@ builder.Services.Configure<DynamoConfig>(
 builder.Services.AddSingleton<IAmazonDynamoDB>(_ => new AmazonDynamoDBClient());
 builder.Services.AddSingleton<IWebhookStore, DynamoWebhookStore>();
 
+// DISCONNECTED_MODE (ADR-0012): token minting is skipped and every OPDA/partner
+// client is wrapped in the fixture-serving fallback decorator, so the demo works
+// with no Raidiam, no partners, and no OPDA APIs reachable.
+var disconnectedMode = string.Equals(
+    Environment.GetEnvironmentVariable("DISCONNECTED_MODE"), "true", StringComparison.OrdinalIgnoreCase);
+
+IOpdaClient WrapForMode(IOpdaClient inner, IServiceProvider sp) => disconnectedMode
+    ? new FallbackOpdaClient(inner, sp.GetRequiredService<ILogger<FallbackOpdaClient>>())
+    : inner;
+
 builder.Services.AddSingleton<IOpdaClient>(sp =>
-    OpdaClient.CreateAsync(new OpdaClientConfig
+    WrapForMode(OpdaClient.CreateAsync(new OpdaClientConfig
     {
         ApiBaseUrl     = Environment.GetEnvironmentVariable("OPDA_API_BASE_URL") ?? "",
         ClientCertPath = Environment.GetEnvironmentVariable("OPDA_CLIENT_CERT_PATH") ?? "",
@@ -24,11 +34,12 @@ builder.Services.AddSingleton<IOpdaClient>(sp =>
         ClientId        = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
         TokenEndpoint   = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
         Scope           = Environment.GetEnvironmentVariable("OPDA_SCOPE") ?? "land-registry",
-    }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult());
+        Disconnected    = disconnectedMode,
+    }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult(), sp));
 
 // ViewMyChain — same mTLS cert + signing key, different base URL and scope.
 builder.Services.AddKeyedSingleton<IOpdaClient>("vmc", (sp, _) =>
-    OpdaClient.CreateAsync(new OpdaClientConfig
+    WrapForMode(OpdaClient.CreateAsync(new OpdaClientConfig
     {
         ApiBaseUrl     = Environment.GetEnvironmentVariable("VMC_BASE_URL") ?? "",
         ClientCertPath = Environment.GetEnvironmentVariable("OPDA_CLIENT_CERT_PATH") ?? "",
@@ -37,11 +48,12 @@ builder.Services.AddKeyedSingleton<IOpdaClient>("vmc", (sp, _) =>
         ClientId        = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
         TokenEndpoint   = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
         Scope           = Environment.GetEnvironmentVariable("VMC_SCOPE") ?? "transaction-status",
-    }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult());
+        Disconnected    = disconnectedMode,
+    }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult(), sp));
 
 // Property Deals Insight — same mTLS cert + signing key, scope: property-pack.
 builder.Services.AddKeyedSingleton<IOpdaClient>("pdi", (sp, _) =>
-    OpdaClient.CreateAsync(new OpdaClientConfig
+    WrapForMode(OpdaClient.CreateAsync(new OpdaClientConfig
     {
         ApiBaseUrl     = Environment.GetEnvironmentVariable("PDI_BASE_URL") ?? "",
         ClientCertPath = Environment.GetEnvironmentVariable("OPDA_CLIENT_CERT_PATH") ?? "",
@@ -50,7 +62,8 @@ builder.Services.AddKeyedSingleton<IOpdaClient>("pdi", (sp, _) =>
         ClientId        = Environment.GetEnvironmentVariable("OPDA_CLIENT_ID") ?? "",
         TokenEndpoint   = Environment.GetEnvironmentVariable("OPDA_TOKEN_ENDPOINT") ?? "",
         Scope           = Environment.GetEnvironmentVariable("PDI_SCOPE") ?? "property-pack",
-    }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult());
+        Disconnected    = disconnectedMode,
+    }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult(), sp));
 
 // Sprift — mTLS + private_key_jwt (PDTF directory, scope: test) + x-api-key header (sandbox only).
 // Skipped if SPRIFT_BASE_URL is not configured.
@@ -58,7 +71,7 @@ var spriftBaseUrl = Environment.GetEnvironmentVariable("SPRIFT_BASE_URL") ?? "";
 if (!string.IsNullOrEmpty(spriftBaseUrl))
 {
     builder.Services.AddKeyedSingleton<IOpdaClient>("sprift", (sp, _) =>
-        OpdaClient.CreateAsync(new OpdaClientConfig
+        WrapForMode(OpdaClient.CreateAsync(new OpdaClientConfig
         {
             ApiBaseUrl      = spriftBaseUrl,
             ClientCertPath  = Environment.GetEnvironmentVariable("OPDA_CLIENT_CERT_PATH") ?? "",
@@ -69,7 +82,8 @@ if (!string.IsNullOrEmpty(spriftBaseUrl))
             Scope            = Environment.GetEnvironmentVariable("SPRIFT_SCOPE") ?? "property-pack",
             ApiKeyPath       = Environment.GetEnvironmentVariable("SPRIFT_API_KEY_PATH"),
             ApiKeyHeaderName = "x-api-key",
-        }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult());
+            Disconnected     = disconnectedMode,
+        }, sp.GetRequiredService<ILogger<OpdaClient>>()).GetAwaiter().GetResult(), sp));
 }
 
 // Smoove — API key only, no mTLS. Skipped if SMOOVE_BASE_URL is not set.

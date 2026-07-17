@@ -108,3 +108,15 @@ variable "armalytix_client_request_id" {
   type        = string
   default     = "e574b05f-94fc-4249-be94-695bab8b268b"
 }
+
+variable "opda_token_endpoint" {
+  type        = string
+  description = "OAuth token endpoint the BFF mints client-credentials tokens from (Raidiam directory, or the auth stub's /token after decoupling — ADR-0012)."
+  default     = "https://matls-auth.directory.pdtf.raidiam.io/token"
+}
+
+variable "disconnected_mode" {
+  type        = bool
+  description = "Fully self-contained sandbox mode: skip token minting and serve canned fixtures for unreachable upstreams (ADR-0012). Flip via the DISCONNECTED_MODE GitHub variable + redeploy."
+  default     = false
+}

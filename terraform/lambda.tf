@@ -20,7 +20,8 @@ resource "aws_lambda_function" "app" {
       OPDA_CLIENT_KEY_PATH   = aws_ssm_parameter.opda_client_key.name
       OPDA_SIGNING_KEY_PATH  = aws_ssm_parameter.opda_signing_key.name
       OPDA_CLIENT_ID         = var.opda_client_id
-      OPDA_TOKEN_ENDPOINT    = "https://matls-auth.directory.pdtf.raidiam.io/token"
+      OPDA_TOKEN_ENDPOINT    = var.opda_token_endpoint
+      DISCONNECTED_MODE      = var.disconnected_mode ? "true" : "false"
       OPDA_SCOPE             = "land-registry"
       VMC_BASE_URL            = var.vmc_base_url
       VMC_SCOPE               = "land-registry"

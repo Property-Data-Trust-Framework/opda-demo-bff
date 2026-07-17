@@ -20,6 +20,7 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
     private readonly string _clientId;
     private readonly string _tokenEndpoint;
     private readonly string _scope;
+    private readonly bool _disconnected;
     private readonly ILogger<OpdaClient> _log;
 
     private string? _cachedToken;
@@ -58,11 +59,13 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
             clientId:      cfg.ClientId,
             tokenEndpoint: cfg.TokenEndpoint,
             scope:         cfg.Scope,
+            disconnected:  cfg.Disconnected,
             log:           log);
     }
 
     private OpdaClient(HttpClient apiClient, HttpClient tokenClient, RSA signingKey,
-                       string clientId, string tokenEndpoint, string scope, ILogger<OpdaClient> log)
+                       string clientId, string tokenEndpoint, string scope, bool disconnected,
+                       ILogger<OpdaClient> log)
     {
         _apiClient     = apiClient;
         _tokenClient   = tokenClient;
@@ -70,7 +73,26 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         _clientId      = clientId;
         _tokenEndpoint = tokenEndpoint;
         _scope         = scope;
+        _disconnected  = disconnected;
         _log           = log;
+    }
+
+    // Socket-level failures (DNS, connection refused/reset, timeout) used to
+    // propagate as exceptions → 500 from the endpoint. Downstream unreachability
+    // is an expected state (partner APIs, disconnected sandbox), so it maps to
+    // null exactly like a clean upstream 5xx does.
+    private async Task<HttpResponseMessage?> SendSafeAsync(HttpRequestMessage req, CancellationToken ct)
+    {
+        try
+        {
+            return await _apiClient.SendAsync(req, ct);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            _log.LogError("Upstream unreachable for {Scope} {Method} {Path}: {Error}",
+                _scope, req.Method, req.RequestUri, e.Message);
+            return null;
+        }
     }
 
     public async Task<JsonElement?> GetAsync(string path, CancellationToken ct = default)
@@ -79,7 +101,8 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         if (token is null) { _log.LogError("Token acquisition failed for {Scope} GET {Path}", _scope, path); return null; }
         using var req = new HttpRequestMessage(HttpMethod.Get, path);
         req.Headers.Authorization = new("Bearer", token);
-        var res = await _apiClient.SendAsync(req, ct);
+        var res = await SendSafeAsync(req, ct);
+        if (res is null) return null;
         if (!res.IsSuccessStatusCode)
         {
             var errBody = await res.Content.ReadAsStringAsync(ct);
@@ -98,7 +121,8 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         req.Content = JsonContent.Create(body);
         var reqBody = System.Text.Json.JsonSerializer.Serialize(body);
         _log.LogInformation("Outbound {Scope} POST {Path}: {Body}", _scope, path, reqBody);
-        var res = await _apiClient.SendAsync(req, ct);
+        var res = await SendSafeAsync(req, ct);
+        if (res is null) return null;
         if (!res.IsSuccessStatusCode)
         {
             var errBody = await res.Content.ReadAsStringAsync(ct);
@@ -114,7 +138,8 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         if (token is null) return (null, null);
         using var req = new HttpRequestMessage(HttpMethod.Get, path);
         req.Headers.Authorization = new("Bearer", token);
-        var res = await _apiClient.SendAsync(req, ct);
+        var res = await SendSafeAsync(req, ct);
+        if (res is null) return (null, null);
         if (!res.IsSuccessStatusCode)
         {
             var errBody = await res.Content.ReadAsStringAsync(ct);
@@ -133,7 +158,8 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         using var req = new HttpRequestMessage(HttpMethod.Post, path);
         req.Headers.Authorization = new("Bearer", token);
         req.Content = JsonContent.Create(body);
-        var res = await _apiClient.SendAsync(req, ct);
+        var res = await SendSafeAsync(req, ct);
+        if (res is null) return (null, null);
         if (!res.IsSuccessStatusCode)
         {
             var errBody = await res.Content.ReadAsStringAsync(ct);
@@ -152,7 +178,8 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
         using var req = new HttpRequestMessage(HttpMethod.Post, path);
         req.Headers.Authorization = new("Bearer", token);
         req.Content = new FormUrlEncodedContent(fields);
-        var res = await _apiClient.SendAsync(req, ct);
+        var res = await SendSafeAsync(req, ct);
+        if (res is null) return null;
         return res.IsSuccessStatusCode
             ? await res.Content.ReadFromJsonAsync<JsonElement>(ct)
             : null;
@@ -162,6 +189,10 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
 
     private async Task<string?> GetTokenAsync(CancellationToken ct)
     {
+        // Disconnected sandbox: no token infrastructure exists. The shared proxy only
+        // requires a non-empty Bearer header and the authorizers run bypassed.
+        if (_disconnected) return "sandbox-disconnected";
+
         if (_cachedToken != null && DateTimeOffset.UtcNow < _tokenExpiry.AddMinutes(-1))
             return _cachedToken;
 
@@ -180,7 +211,16 @@ public sealed class OpdaClient : IOpdaClient, IDisposable
                 new("scope",                 _scope),
             ]);
 
-            var res = await _tokenClient.PostAsync(_tokenEndpoint, form, ct);
+            HttpResponseMessage res;
+            try
+            {
+                res = await _tokenClient.PostAsync(_tokenEndpoint, form, ct);
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+            {
+                _log.LogError("Token endpoint unreachable for scope {Scope}: {Error}", _scope, e.Message);
+                return null;
+            }
             if (!res.IsSuccessStatusCode)
             {
                 var detail = await res.Content.ReadAsStringAsync(ct);
