@@ -126,3 +126,24 @@ variable "partner_token_endpoint" {
   description = "Token endpoint for PARTNER-facing clients (VMC/PDI/Sprift). Stays on Raidiam even when opda_token_endpoint points at the auth stub — partners introspect against Raidiam (ADR-0012)."
   default     = "https://matls-auth.directory.pdtf.raidiam.io/token"
 }
+
+# ── Wallet credential verification (ADR-0013) ─────────────────────────────────
+
+variable "wallet_trusted_issuers" {
+  type        = string
+  description = "JSON map of trusted VC issuer (`iss` HTTPS URL) to PEM public key. Empty registry means every presentation is parsed but fails signature verification."
+  default     = "{}"
+  sensitive   = true
+}
+
+variable "wallet_verifier_client_id" {
+  type        = string
+  description = "client_id the BFF presents in OpenID4VP requests as the verifier. Defaults to the repo name if unset."
+  default     = ""
+}
+
+variable "public_base_url" {
+  type        = string
+  description = "Publicly reachable base URL for this BFF, used to build the OpenID4VP request_uri and response_uri a wallet calls back to."
+  default     = ""
+}

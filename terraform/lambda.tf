@@ -33,6 +33,12 @@ resource "aws_lambda_function" "app" {
       SPRIFT_API_KEY_PATH     = aws_ssm_parameter.sprift_api_key.name
       ARMALYTIX_CLIENT_REQUEST_ID = var.armalytix_client_request_id
       DynamoConfig__TableName     = aws_dynamodb_table.webhook_events.name
+
+      # Wallet credential verification (ADR-0013)
+      WalletStoreConfig__TableName = aws_dynamodb_table.wallet_presentations.name
+      WALLET_TRUSTED_ISSUERS_PATH  = aws_ssm_parameter.wallet_trusted_issuers.name
+      WALLET_VERIFIER_CLIENT_ID    = var.wallet_verifier_client_id != "" ? var.wallet_verifier_client_id : var.name
+      PUBLIC_BASE_URL              = var.public_base_url
     }
   }
 

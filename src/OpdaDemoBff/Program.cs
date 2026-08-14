@@ -101,6 +101,23 @@ if (!string.IsNullOrEmpty(smooveBaseUrl))
             sp.GetRequiredService<ILogger<SmooveClient>>()).GetAwaiter().GetResult());
 }
 
+// Wallet credential verification (ADR-0013): the BFF acts as an OpenID4VP
+// verifier, requesting a presentation from the customer's wallet and checking
+// it against a sandbox-grade trusted-issuer registry — same SSM-JSON-parameter
+// shape as the ADR-0012 auth stub's client registry, no real trust framework
+// wired up yet. See the ADR for what's real vs. stubbed here.
+builder.Services.Configure<WalletStoreConfig>(
+    builder.Configuration.GetSection(nameof(WalletStoreConfig)));
+builder.Services.AddSingleton<IWalletPresentationStore, DynamoWalletPresentationStore>();
+builder.Services.AddSingleton<IIssuerKeyResolver>(sp =>
+    StaticIssuerKeyResolver.CreateAsync(
+        Environment.GetEnvironmentVariable("WALLET_TRUSTED_ISSUERS_PATH"),
+        sp.GetRequiredService<ILogger<StaticIssuerKeyResolver>>()).GetAwaiter().GetResult());
+builder.Services.AddSingleton<IWalletVerifier, SdJwtWalletVerifier>();
+
+var walletVerifierClientId = Environment.GetEnvironmentVariable("WALLET_VERIFIER_CLIENT_ID") ?? "opda-demo-bff";
+var publicBaseUrl = Environment.GetEnvironmentVariable("PUBLIC_BASE_URL") ?? "";
+
 var app = builder.Build();
 
 // ── POST /webhook ─────────────────────────────────────────────────────────────
@@ -463,6 +480,95 @@ app.MapPost("/demo-api/conveyancing/completion-actioned", async (ConveyRequest r
     return Results.Ok(new { status = "triggered" });
 });
 
+// ── POST /demo-api/wallet/presentation-request/{transactionDid} ─────────────
+// Creates an OpenID4VP authorization request (ADR-0013). Returns a state and a
+// request_uri — the SPA renders the latter as a QR code / deep link for the
+// wallet to fetch.
+
+app.MapPost("/demo-api/wallet/presentation-request/{transactionDid}", async (
+    string transactionDid,
+    WalletPresentationRequestBody body,
+    IWalletPresentationStore store,
+    CancellationToken ct) =>
+{
+    if (body.CredentialTypes is null || body.CredentialTypes.Length == 0)
+        return Results.BadRequest(new { error = "credentialTypes is required" });
+
+    var state = Guid.NewGuid().ToString("N");
+    var nonce = Guid.NewGuid().ToString("N");
+    await store.CreateAsync(state, transactionDid, body.CredentialTypes, nonce, ct);
+
+    return Results.Ok(new
+    {
+        state,
+        requestUri = $"{publicBaseUrl}/demo-api/wallet/request/{state}",
+    });
+});
+
+// ── GET /demo-api/wallet/request/{state} ─────────────────────────────────────
+// The OpenID4VP request object itself — what the wallet fetches after scanning
+// the QR/deep link from the call above.
+
+app.MapGet("/demo-api/wallet/request/{state}", async (
+    string state,
+    IWalletPresentationStore store,
+    CancellationToken ct) =>
+{
+    var pending = await store.GetAsync(state, ct);
+    if (pending is null || pending.Status != "pending") return Results.NotFound();
+
+    return Results.Ok(new
+    {
+        response_type = "vp_token",
+        response_mode = "direct_post",
+        client_id = walletVerifierClientId,
+        response_uri = $"{publicBaseUrl}/demo-api/wallet/callback",
+        nonce = pending.Nonce,
+        state,
+        // Coarse-grained only — Attachment A does not require claim-level
+        // selective disclosure requests for the MVP.
+        credential_types = pending.CredentialTypes,
+    });
+});
+
+// ── POST /demo-api/wallet/callback ────────────────────────────────────────────
+// OpenID4VP direct_post: the wallet posts vp_token + state here once the holder
+// consents to the presentation.
+
+app.MapPost("/demo-api/wallet/callback", async (
+    HttpRequest request,
+    IWalletPresentationStore store,
+    IWalletVerifier verifier,
+    CancellationToken ct) =>
+{
+    var form = await request.ReadFormAsync(ct);
+    var state = form["state"].ToString();
+    var vpToken = form["vp_token"].ToString();
+    if (string.IsNullOrEmpty(state) || string.IsNullOrEmpty(vpToken))
+        return Results.BadRequest(new { error = "state and vp_token are required" });
+
+    var pending = await store.GetAsync(state, ct);
+    if (pending is null) return Results.NotFound();
+
+    var outcome = await verifier.VerifyAsync(vpToken, pending.Nonce, pending.CredentialTypes, ct);
+    await store.CompleteAsync(state, outcome, ct);
+
+    return Results.Ok(new { status = outcome.Verified ? "verified" : "failed" });
+});
+
+// ── GET /demo-api/wallet/result/{state} ───────────────────────────────────────
+// SPA polls this after showing the QR code — same poll-for-async-outcome shape
+// as GET /demo-api/events/{transactionDid}/{event} for Smoove webhooks.
+
+app.MapGet("/demo-api/wallet/result/{state}", async (
+    string state,
+    IWalletPresentationStore store,
+    CancellationToken ct) =>
+{
+    var record = await store.GetAsync(state, ct);
+    return record is not null ? Results.Ok(record) : Results.NotFound();
+});
+
 app.Run();
 
 // UPRNs from OS Places are raw integers (e.g. 5114578); backing OPDA APIs require
@@ -472,3 +578,4 @@ static string PadUprn(string uprn) => uprn.PadLeft(12, '0');
 public partial class Program { }
 
 record ConveyRequest(string TransactionDid);
+record WalletPresentationRequestBody(string[] CredentialTypes);

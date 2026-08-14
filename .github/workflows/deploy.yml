@@ -45,6 +45,9 @@ jobs:
       TF_VAR_disconnected_mode:  ${{ vars.DISCONNECTED_MODE || 'false' }}
       TF_VAR_partner_token_endpoint: ${{ vars.PARTNER_TOKEN_ENDPOINT || 'https://matls-auth.directory.pdtf.raidiam.io/token' }}
       TF_VAR_sprift_api_key:     ${{ secrets.SPRIFT_API_KEY }}
+      TF_VAR_wallet_trusted_issuers:    ${{ secrets.WALLET_TRUSTED_ISSUERS || '{}' }}
+      TF_VAR_wallet_verifier_client_id: ${{ vars.WALLET_VERIFIER_CLIENT_ID }}
+      TF_VAR_public_base_url:           ${{ vars.PUBLIC_BASE_URL }}
 
     permissions:
       id-token: write

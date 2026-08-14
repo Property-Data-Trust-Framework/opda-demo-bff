@@ -35,6 +35,7 @@ resource "aws_iam_role_policy" "lambda_ssm" {
         aws_ssm_parameter.opda_client_key.arn,
         aws_ssm_parameter.opda_signing_key.arn,
         aws_ssm_parameter.sprift_api_key.arn,
+        aws_ssm_parameter.wallet_trusted_issuers.arn,
       ]
     }]
   })
@@ -46,14 +47,27 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "dynamodb:PutItem",
-        "dynamodb:GetItem",
-        "dynamodb:Query",
-      ]
-      Resource = aws_dynamodb_table.webhook_events.arn
-    }]
+    Statement = [
+      {
+        Sid    = "WebhookEvents"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+        ]
+        Resource = aws_dynamodb_table.webhook_events.arn
+      },
+      {
+        Sid    = "WalletPresentations"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+        ]
+        Resource = aws_dynamodb_table.wallet_presentations.arn
+      },
+    ]
   })
 }
