@@ -426,7 +426,7 @@ h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;}
 
 /* property chain */
 .chaincard{margin-top:18px;}
-.chain{display:flex;align-items:stretch;gap:8px;overflow-x:auto;padding:10px 2px 4px;}
+.chain{display:flex;align-items:stretch;gap:8px;overflow-x:auto;padding:12px 2px 4px 9px;margin:-2px 0 0 -7px;}
 .clink{flex:1;min-width:150px;border:1px solid var(--line-2);border-radius:var(--radius-sm);background:var(--bg);
   padding:11px 13px;display:flex;flex-direction:column;gap:5px;position:relative;}
 .clink .cpos{position:absolute;top:-10px;left:-7px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line-2);
@@ -561,7 +561,7 @@ h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;}
 /* ============================================================
    BRANCHING TRACKER (git-graph)
    ============================================================ */
-.htrack{position:relative;height:212px;margin:2px 0 24px;background:var(--paper);border:1px solid var(--line);
+.htrack{position:relative;height:220px;margin:2px 0 24px;background:var(--paper);border:1px solid var(--line);
   border-radius:var(--radius);box-shadow:var(--shadow-sm);padding:0 6px;}
 .htrack svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
 .hseg{fill:none;stroke:var(--line-2);stroke-width:2.4;stroke-linecap:round;}
@@ -590,7 +590,7 @@ h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;}
 .hnode.origin{width:16px;height:16px;border-radius:50%;background:var(--navy);border-color:var(--navy);}
 @keyframes hpulse{0%,100%{box-shadow:0 0 0 5px var(--amber-bg);}50%{box-shadow:0 0 0 9px rgba(244,168,29,.12);}}
 
-.hlab{position:absolute;top:152px;transform:translateX(-50%);text-align:center;width:150px;z-index:2;}
+.hlab{position:absolute;top:160px;transform:translateX(-50%);text-align:center;width:150px;z-index:2;}
 .hlab .ln{font-size:13px;font-weight:600;color:var(--ink);line-height:1.12;}
 .hlab .ln .sub{display:block;font-weight:400;color:var(--ink-3);font-size:11.5px;}
 .hlab .ln.muted{color:var(--ink-3);font-weight:600;font-size:11.5px;}
@@ -681,7 +681,136 @@ h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;}
 .waitchip.ok{color:var(--ok-2);background:var(--ok-bg);border-color:var(--ok-ring);}
 
 @media (max-width:880px){
-  .htrack{height:196px;}
   .hlab{width:108px;font-size:12px;}
   .hdeplab{width:110px;}
+}
+
+/* the tracker draws into an inner box inside its own scroller, so on a narrow screen it can keep its width */
+.htrack-sc{position:absolute;inset:0;}
+.htrack-in{position:relative;width:100%;height:100%;}
+
+/* sideways scrollers fade at an edge only while there is more content past it (edgeFade in app.js) */
+.hscroll{--fl:0px;--fr:0px;
+  -webkit-mask-image:linear-gradient(to right,transparent,#000 var(--fl),#000 calc(100% - var(--fr)),transparent);
+          mask-image:linear-gradient(to right,transparent,#000 var(--fl),#000 calc(100% - var(--fr)),transparent);}
+.hscroll.fade-l{--fl:32px;}
+.hscroll.fade-r{--fr:32px;}
+
+/* back to top - shows once the page has scrolled well past the first screen */
+.totop{position:fixed;right:18px;bottom:18px;z-index:1100;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
+  color:var(--amber-d);background:var(--paper);border:1.5px solid var(--amber-ring);box-shadow:var(--shadow);cursor:pointer;
+  opacity:0;transform:translateY(8px);pointer-events:none;transition:.18s;}
+.totop svg{width:18px;height:18px;}
+.totop.show{opacity:1;transform:none;pointer-events:auto;}
+@media (hover:hover){ .totop:hover{background:var(--amber-bg);} }
+.totop:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+
+/* tablets: the branding row tightens so the three blocks still fit */
+@media (max-width:1100px){
+  .topbar{column-gap:12px;padding:0 16px;}
+  .orglogos{height:40px;}
+  .brand .nm b{font-size:20px;}
+  .brandmeta{gap:8px;}
+  .envpill{font-size:10px;padding:5px 10px;}
+}
+
+/* ============================================================
+   PHONES AND SMALL TABLETS - one column, the header folds over the page
+   ============================================================ */
+@media (max-width:900px){
+  /* the page scrolls under the header; its scrollbar sits in the right margin, reserved even when nothing scrolls */
+  .app{position:relative;height:100vh;height:100dvh;}
+  .body{position:relative;z-index:0;}
+  .main{padding:calc(var(--topH,0px) + var(--headH,0px) + 15px) max(0px, calc(12px - var(--sbw,0px))) 48px 12px;scrollbar-gutter:stable;}
+
+  /* the header lies over the scroller, so sliding the branding and role rows away never moves the page (app.js) */
+  .topbar,.headlower{position:absolute;left:0;right:0;z-index:20;transition:transform .22s ease;}
+  .topbar{top:0;z-index:21;}
+  .headlower{top:calc(var(--topH,0px) - 1px);}
+  .app.folded .topbar{transform:translateY(-100%);}
+  .app.folded .headlower{transform:translateY(calc(1px - var(--topH,0px) - var(--roleH,0px)));}
+  /* the page's scrollbar starts under whatever part of the header is showing and sits in the page's right margin */
+  .main::-webkit-scrollbar-track{margin-top:calc(var(--topH,0px) + var(--headH,0px) - 1px);}
+  .app.folded .main::-webkit-scrollbar-track{margin-top:calc(var(--headH,0px) - var(--roleH,0px));}
+
+  /* touch scrolls sideways without a bar; the edge fade says there is more */
+  .rolebar,.viewseg,.htrack-sc,.chain{scrollbar-width:none;}
+  .rolebar::-webkit-scrollbar,.viewseg::-webkit-scrollbar,.htrack-sc::-webkit-scrollbar,.chain::-webkit-scrollbar{display:none;}
+
+  /* branding: the logos, then the name on one line; the environment pill is a desktop detail */
+  .topbar{grid-template-columns:1fr;row-gap:4px;height:auto;padding:10px 12px 8px;}
+  .orglogos{height:auto;max-height:28px;max-width:100%;justify-self:center;}
+  .brand .nm{display:flex;align-items:baseline;gap:8px;}
+  .brand .nm b{font-size:17px;}
+  .brand .nm span{margin:0;font-size:9.5px;}
+  .brandmeta{display:none;}
+
+  /* roles: one compact tab each, the cue and the role number on one line above the name */
+  .headlower{flex-direction:column;}
+  .rolebar{flex:none;gap:0;padding:0;}
+  .rtab{flex:0 0 auto;min-width:0;flex-direction:row;flex-wrap:wrap;justify-content:center;align-content:center;
+    gap:2px 4px;width:96px;padding:7px 8px 6px;}
+  .rtab .rb{height:auto;margin:0;}
+  .rtab .rn{font-size:9px;}
+  .rtab .rnm{flex-basis:100%;font-size:12px;line-height:1.15;white-space:normal;text-align:center;}
+
+  /* controls: address, provenance and reset share a row; the views run edge to edge */
+  .ctrlpanel{flex:none;min-width:0;border-left:0;border-top:1px solid var(--line);}
+  .ctrlrow{gap:8px;padding:8px 12px;min-height:0;}
+  .search{flex:1 1 0;min-width:0;max-width:none;}
+  .ctrlrow .provsum{margin-left:0;padding:3px 9px 3px 4px;}
+  .provsum .lbl{font-size:0;}
+  .provsum .lbl b{font-size:11px;}
+  .provsum .pw{display:none;}
+  /* the seal's rays turn green as sources are verified */
+  .provsum .seal::after{opacity:1;background:conic-gradient(var(--ok) calc(var(--p,0) * 1turn),var(--ok-ring) 0);
+    -webkit-mask:repeating-conic-gradient(#000 0 3deg,transparent 3deg 12deg),radial-gradient(farthest-side,transparent calc(100% - 3.5px),#000 calc(100% - 3px));
+    -webkit-mask-composite:source-in;
+            mask:repeating-conic-gradient(#000 0 3deg,transparent 3deg 12deg),radial-gradient(farthest-side,transparent calc(100% - 3.5px),#000 calc(100% - 3px));
+            mask-composite:intersect;}
+  .resetdemo{font-size:0;gap:0;padding:7px;}
+  .ctrlrow-bot{padding:8px 0;}
+  .ctrlrow-bot .rsep-l,.ctrlrow-bot .rtab.future{display:none;}
+  .viewseg{flex:1 1 100%;margin-left:0;padding:0 12px;border-left:0;overflow-x:auto;gap:6px;}
+  .viewseg button{flex:none;}
+  /* rows that fit are centred; auto margins keep the start reachable when they scroll */
+  .rolebar .rtab:first-child,.viewseg button:first-child{margin-left:auto;}
+  .rolebar .rtab:last-child,.viewseg button:last-child{margin-right:auto;}
+
+  /* persona: avatar and text, the stats underneath */
+  .persona{flex-wrap:wrap;align-items:flex-start;gap:12px 14px;padding:16px;}
+  .persona .avatar{width:46px;height:46px;}
+  .persona .ptxt{flex:1 1 calc(100% - 64px);}
+  .persona .ptxt h1{font-size:19px;}
+  .persona .pstats{flex:1 1 100%;justify-content:space-between;gap:12px;padding:12px 0 0;border-left:0;border-top:1px solid var(--line);}
+
+  /* the branching tracker keeps its desktop width and scrolls sideways inside its card */
+  .htrack{overflow:hidden;padding:0;height:232px;}
+  .htrack-sc{overflow-x:auto;overflow-y:hidden;}
+  .htrack-in{min-width:720px;}
+
+  /* every card takes the full row */
+  .grid{grid-template-columns:minmax(0,1fr);gap:12px;}
+  .grid > .card{grid-column:1 / -1;min-width:0;}
+  .card{padding:15px;}
+  .kpis.c3,.kpis.c4{grid-template-columns:1fr 1fr;}
+  .idform{grid-template-columns:1fr;}
+
+  .detail-head,.np-head,.plhead,.trig-foot,.searchwrap,.idfoot{flex-wrap:wrap;}
+  .detail-head .d-api{margin-left:0;}
+  .sugg-row{flex-wrap:wrap;}
+  .sugg{white-space:nowrap;}
+  .np-t{white-space:normal;}
+  .np-api{flex:1 1 100%;order:3;}
+  .frow{flex-wrap:wrap;gap:4px 12px;}
+  .frow .fl{width:auto;flex:1 1 100%;}
+  .gatecard .gatebar{flex-wrap:wrap;}
+  .gatecard .cbtns{flex:1 1 100%;}
+  .plempty{flex-direction:column;align-items:flex-start;margin:24px auto;padding:22px;}
+  .pdtfjson{max-height:60vh;}
+}
+
+/* no sliding header or fading button for people who ask for less motion */
+@media (prefers-reduced-motion:reduce){
+  .topbar,.headlower,.totop{transition:none;}
 }
