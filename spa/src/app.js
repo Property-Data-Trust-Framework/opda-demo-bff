@@ -206,7 +206,7 @@ function renderRail(){
 /* ============================================================
    BRANCHING TRACKER  (git-graph, OPDA styling)
    ============================================================ */
-const T = { W:1000, RAIL:128, BR:54, DIV:92, H:212 };
+const T = { W:1000, RAIL:136, BR:54, DIV:92, H:220 };
 const nodeX = (i,n)=> (i+0.5)/n*T.W;
 function branchGeo(role,b){
   const r=roleObj(role), n=r.nodes.length;
@@ -241,7 +241,7 @@ function renderTracker(role){
   });
 
   const divider=`<line class="hdiv" x1="14" y1="${T.DIV}" x2="${T.W-14}" y2="${T.DIV}" vector-effect="non-scaling-stroke"/>`;
-  const svgEl=`<svg viewBox="0 0 ${T.W} ${T.H}" preserveAspectRatio="none">${divider}${segs}${legs}</svg>`;
+  const svgEl=`<svg viewBox="0 0 ${T.W} ${T.H}" preserveAspectRatio="none" style="height:${T.H}px;">${divider}${segs}${legs}</svg>`;
 
   // rail nodes + labels
   let nodes='';
@@ -267,7 +267,7 @@ function renderTracker(role){
   const hints = (r.branches&&r.branches.length)
     ? `<div class="hhint up" style="top:${T.DIV-22}px;">↑ another party</div><div class="hhint dn" style="top:${T.DIV+7}px;">↓ ${SHORT[role]}'s own steps</div>`
     : '';
-  el.innerHTML = svgEl + nodes + deps + hints;
+  el.innerHTML = `<div class="htrack-sc"><div class="htrack-in">${svgEl + nodes + deps + hints}</div></div>`;
 }
 
 /* ============================================================
@@ -650,7 +650,10 @@ function updateProvCount(){
   if(!pc) return;
   const signed = PAYLOADS.sources.filter(s=>s.signed);
   const retrieved = signed.filter(s=>payloadRetrieved(s.gate)).length;
-  pc.textContent=`${retrieved} / ${signed.length} verified`;
+  pc.innerHTML=`${retrieved} / ${signed.length}<span class="pw"> verified</span>`;
+  const sum=pc.closest('.provsum');
+  sum.style.setProperty('--p', signed.length ? retrieved/signed.length : 0);
+  sum.title=`${retrieved} of ${signed.length} signed sources verified`;
 }
 function gateHint(gate){
   if(gate==='sof')        return 'bconv';
@@ -1163,6 +1166,58 @@ document.body.addEventListener('click',e=>{
 });
 
 /* ============================================================
+   NARROW SCREENS  (scroller edge fades, header fold, back to top)
+   ============================================================ */
+// Sideways scrollers fade at whichever edge still has content beyond it (see .hscroll in opda.css).
+// The rail, tracker and chain are re-rendered often, so every scroller is re-measured after any DOM change.
+const HSCROLL='.rolebar,.viewseg,.htrack-sc,.chain';
+function edgeFade(el){
+  const max=el.scrollWidth-el.clientWidth;
+  el.classList.add('hscroll');
+  el.classList.toggle('fade-l', max>2 && el.scrollLeft>2);
+  el.classList.toggle('fade-r', max>2 && el.scrollLeft<max-2);
+}
+let fadeQueued=false;
+function fadeAll(){
+  if(fadeQueued) return;
+  fadeQueued=true;
+  requestAnimationFrame(()=>{ fadeQueued=false; document.querySelectorAll(HSCROLL).forEach(edgeFade); });
+}
+function initEdgeFades(){
+  document.addEventListener('scroll', e=>{ if(e.target.matches && e.target.matches(HSCROLL)) edgeFade(e.target); }, true);
+  window.addEventListener('resize', fadeAll);
+  new MutationObserver(fadeAll).observe(document.body, { childList:true, subtree:true });
+  fadeAll();
+}
+// On phones the header sits over the scroller (see the phone rules in opda.css): the branding and role rows
+// slide away after a short scroll down and only come back after a deliberate scroll up, or near the top.
+// They never fold before the page has scrolled past the space they free, so no blank band opens above the content.
+function initHeaderFold(){
+  const sc=document.querySelector('main.main'), app=document.querySelector('.app'), toTop=document.getElementById('toTop');
+  const topbar=document.querySelector('.topbar'), head=document.querySelector('.headlower'), roles=document.querySelector('.rolebar');
+  const measure=()=>{
+    app.style.setProperty('--topH', topbar.getBoundingClientRect().height+'px');
+    app.style.setProperty('--headH', head.getBoundingClientRect().height+'px');
+    app.style.setProperty('--roleH', roles.getBoundingClientRect().height+'px');
+    app.style.setProperty('--sbw', (sc.offsetWidth-sc.clientWidth)+'px');
+  };
+  const ro=new ResizeObserver(measure);
+  [topbar, head, sc].forEach(el=>ro.observe(el));
+  measure();
+  let lastY=0, travel=0;
+  sc.addEventListener('scroll', ()=>{
+    const y=sc.scrollTop, dy=y-lastY;
+    lastY=y;
+    toTop.classList.toggle('show', y>600);
+    travel=(Math.sign(dy)===Math.sign(travel)) ? travel+dy : dy;
+    if(y < topbar.offsetHeight+roles.offsetHeight+16) app.classList.remove('folded');
+    else if(travel > 24) app.classList.add('folded');
+    else if(travel < -80) app.classList.remove('folded');
+  }, { passive:true });
+  toTop.addEventListener('click', ()=>{ toTop.blur(); sc.scrollTo({ top:0, behavior:'smooth' }); });
+}
+
+/* ============================================================
    INIT
    ============================================================ */
 try{ const s=JSON.parse(localStorage.getItem('opda-state')); if(s&&s.role&&roleObj(s.role)){ state=Object.assign(state,s); } }catch(e){}
@@ -1170,6 +1225,8 @@ state.flags=state.flags||{}; state.id=state.id||{}; state.surv=state.surv||{}; s
 renderRail();
 renderFlow();
 setView(state.view||'flows');
+initEdgeFades();
+initHeaderFold();
 cascade();
 pollBffEvents();
 setInterval(pollBffEvents, 5000);
